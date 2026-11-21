@@ -1,9 +1,13 @@
-// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - WITH DARK MODE
+// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - WITH TABLE PASTE, DIAGRAM UPLOADER & DARK MODE
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,9 +15,27 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { X, Plus, Layers, AlertCircle, CheckCircle2 } from 'lucide-react'
+import {
+  X,
+  Plus,
+  Layers,
+  AlertCircle,
+  CheckCircle2,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  Eye,
+  EyeOff,
+  Table as TableIcon,
+  Loader2,
+  Brain,
+  FileCheck,
+  Save,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { QuestionContent } from '@/components/shared/QuestionContent'
+import { createClient } from '@/lib/supabase/client'
 import type { TheoryQuestion, TheorySubQuestion } from './types'
 
 interface TheoryQuestionFormDialogProps {
@@ -29,15 +51,67 @@ interface TheoryQuestionFormDialogProps {
 }
 
 /**
- * ✅ Helper: resolve sub-question text from either canonical field.
+ * Helper: resolve sub-question text from either canonical field.
  * Prefers question_text, falls back to legacy text.
  */
 function getSubText(sq: TheorySubQuestion): string {
   return sq.question_text || sq.text || ''
 }
 
+function handleTablePaste(
+  event: React.ClipboardEvent<HTMLTextAreaElement>,
+  setValue: (value: string) => void
+) {
+  const clipboard = event.clipboardData
+  const html = clipboard.getData('text/html')
+  let rows: string[][] = []
+
+  if (html) {
+    const table = new DOMParser()
+      .parseFromString(html, 'text/html')
+      .querySelector('table')
+
+    if (table) {
+      rows = Array.from(table.querySelectorAll('tr')).map((row) =>
+        Array.from(row.querySelectorAll('th, td')).map((cell) =>
+          (cell.textContent || '').trim().replace(/\s+/g, ' ').replace(/\|/g, '\\|')
+        )
+      )
+    }
+  }
+
+  if (rows.length === 0) {
+    const textRows = clipboard
+      .getData('text/plain')
+      .split(/\r?\n/)
+      .filter((row) => row.trim())
+
+    if (textRows.length > 0 && textRows.some((row) => row.includes('\t'))) {
+      rows = textRows.map((row) =>
+        row.split('\t').map((cell) => cell.trim().replace(/\|/g, '\\|'))
+      )
+    }
+  }
+
+  if (rows.length === 0) return
+
+  event.preventDefault()
+  const columnCount = Math.max(...rows.map((row) => row.length))
+  const normalizedRows = rows.map((row) =>
+    Array.from({ length: columnCount }, (_, index) => row[index] || '')
+  )
+  const markdownRows = normalizedRows.map((row) => `| ${row.join(' | ')} |`)
+  const separator = `| ${Array(columnCount).fill('---').join(' | ')} |`
+  const markdown = [markdownRows[0], separator, ...markdownRows.slice(1)].join('\n')
+  const target = event.currentTarget
+  const start = target.selectionStart
+  const end = target.selectionEnd
+
+  setValue(`${target.value.slice(0, start)}${markdown}${target.value.slice(end)}`)
+}
+
 /**
- * ✅ Helper: normalize any incoming sub-question object into the
+ * Helper: normalize any incoming sub-question object into the
  * full TheorySubQuestion shape (fills missing question_text/text).
  */
 function normalizeSubQuestion(s: any): TheorySubQuestion {
@@ -55,17 +129,31 @@ function normalizeSubQuestion(s: any): TheorySubQuestion {
 }
 
 export function TheoryQuestionFormDialog({
-  open, onOpenChange, initialData, onSave, onCancel,
-  defaultMark = 0.5, totalTheoryMarks = 0, theoryQuestionCount = 0, examTotal = 60,
+  open,
+  onOpenChange,
+  initialData,
+  onSave,
+  onCancel,
+  defaultMark = 0.5,
+  totalTheoryMarks = 0,
+  theoryQuestionCount = 0,
+  examTotal = 60,
 }: TheoryQuestionFormDialogProps) {
   const [questionText, setQuestionText] = useState('')
   const [points, setPoints] = useState(10)
+  const [imageUrl, setImageUrl] = useState<string>('')
+  const [imageCaption, setImageCaption] = useState<string>('')
   const [keywords, setKeywords] = useState<string[]>([])
   const [modelAnswer, setModelAnswer] = useState('')
   const [subQuestions, setSubQuestions] = useState<TheorySubQuestion[]>([])
   const [keywordInput, setKeywordInput] = useState('')
   const [useSubQuestions, setUseSubQuestions] = useState(false)
   const [isDraft, setIsDraft] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const marksPerTheoryQuestion =
     theoryQuestionCount > 0 && totalTheoryMarks > 0
@@ -76,23 +164,25 @@ export function TheoryQuestionFormDialog({
     if (open) {
       setQuestionText(initialData?.question_text || '')
       setPoints(
-        initialData?.points ||
-          (marksPerTheoryQuestion > 0 ? marksPerTheoryQuestion : 10)
+        initialData?.points !== undefined
+          ? initialData.points
+          : marksPerTheoryQuestion > 0
+          ? marksPerTheoryQuestion
+          : 10
       )
+      setImageUrl(initialData?.image_url || '')
+      setImageCaption(initialData?.image_caption || '')
       setKeywords(initialData?.keywords || [])
       setModelAnswer(initialData?.model_answer || '')
 
-      // ✅ Normalize loaded sub-questions so both `question_text` & `text` exist
-      const normalizedSubs = (initialData?.sub_questions || []).map(
-        normalizeSubQuestion
-      )
+      // Normalize loaded sub-questions
+      const normalizedSubs = (initialData?.sub_questions || []).map(normalizeSubQuestion)
       setSubQuestions(normalizedSubs)
       setUseSubQuestions(normalizedSubs.length > 0)
 
-      setIsDraft(
-        initialData?.is_draft !== undefined ? initialData.is_draft : true
-      )
+      setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
       setKeywordInput('')
+      setShowPreview(false)
     }
   }, [open, initialData, marksPerTheoryQuestion])
 
@@ -111,14 +201,14 @@ export function TheoryQuestionFormDialog({
     const keyword = keywordInput.trim().toLowerCase()
     if (!keyword) return
     if (keywords.includes(keyword)) return toast.error('Keyword already added')
-    if (keywords.length >= 10)
-      return toast.error('Maximum 10 keywords per question')
+    if (keywords.length >= 10) return toast.error('Maximum 10 keywords per question')
     setKeywords([...keywords, keyword])
     setKeywordInput('')
   }
 
-  const handleRemoveKeyword = (keyword: string) =>
+  const handleRemoveKeyword = (keyword: string) => {
     setKeywords(keywords.filter((k) => k !== keyword))
+  }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -127,12 +217,74 @@ export function TheoryQuestionFormDialog({
     }
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG, WEBP, SVG)')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB')
+      return
+    }
+
+    setIsUploadingImage(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop()
+      const fileName = `theory/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`
+
+      const { data, error } = await supabase.storage
+        .from('exam-assets')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true })
+
+      if (error) {
+        // Fallback to local Base64 URL
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setImageUrl(reader.result as string)
+          toast.success('Diagram attached (local format)')
+          setIsUploadingImage(false)
+        }
+        reader.readAsDataURL(file)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('exam-assets')
+        .getPublicUrl(data.path)
+
+      setImageUrl(publicUrlData.publicUrl)
+      toast.success('Diagram uploaded successfully')
+    } catch (err) {
+      console.error('Image upload failed, fallback to base64:', err)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImageUrl(reader.result as string)
+        toast.success('Diagram attached')
+      }
+      reader.readAsDataURL(file)
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setImageUrl('')
+    setImageCaption('')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const handleAddSubQuestion = () => {
     const subQuestionPoints =
       marksPerTheoryQuestion > 0
         ? Math.round((marksPerTheoryQuestion / 2) * 100) / 100
         : 5
-    // ✅ Create new sub-question with BOTH fields populated
     setSubQuestions([
       ...subQuestions,
       {
@@ -151,7 +303,7 @@ export function TheoryQuestionFormDialog({
     const updated = [...subQuestions]
     const merged = { ...updated[index], ...data }
 
-    // ✅ Keep question_text and text in sync
+    // Keep question_text and text synchronized
     if (data.question_text !== undefined) {
       merged.text = data.question_text
     } else if (data.text !== undefined) {
@@ -162,141 +314,152 @@ export function TheoryQuestionFormDialog({
     setSubQuestions(updated)
   }
 
-  const handleDeleteSubQuestion = (index: number) =>
+  const handleDeleteSubQuestion = (index: number) => {
     setSubQuestions(subQuestions.filter((_, i) => i !== index))
+  }
 
   const handleClose = () => {
-    onOpenChange(false)
-    if (onCancel) onCancel()
+    if (!isSubmitting) {
+      onOpenChange(false)
+      if (onCancel) onCancel()
+    }
   }
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
+    if (!questionText.trim()) return toast.error('Please enter question text')
+
+    const calculatedPoints = useSubQuestions
+      ? subQuestions.reduce((sum, sq) => sum + (sq.points || 0), 0)
+      : points
+
     if (saveAsDraft) {
-      if (!questionText.trim())
-        return toast.error('Please enter a question text')
+      setIsSubmitting(true)
       onSave({
-        question_text: questionText,
-        points,
-        sub_questions: subQuestions,
+        question_text: questionText.trim(),
+        points: calculatedPoints || defaultMark,
+        sub_questions: useSubQuestions ? subQuestions : [],
         keywords: keywords.length > 0 ? keywords : undefined,
         model_answer: modelAnswer.trim() || undefined,
+        image_url: imageUrl || null,
+        image_caption: imageCaption || null,
         is_draft: true,
       })
+      setTimeout(() => setIsSubmitting(false), 400)
       return
     }
-
-    if (!questionText.trim()) return toast.error('Please enter a question')
 
     if (useSubQuestions) {
       if (subQuestions.length === 0)
         return toast.error('Please add at least one sub-question')
+
       for (let i = 0; i < subQuestions.length; i++) {
         const sq = subQuestions[i]
         if (!getSubText(sq).trim())
+          return toast.error(`Sub-question (${String.fromCharCode(97 + i)}) is empty`)
+        if (sq.points <= 0)
           return toast.error(
-            `Sub-question ${String.fromCharCode(97 + i)} is empty`
-          )
-        if (sq.points < 1)
-          return toast.error(
-            `Sub-question ${String.fromCharCode(
-              97 + i
-            )} points must be at least 1`
+            `Sub-question (${String.fromCharCode(97 + i)}) points must be greater than 0`
           )
       }
-      const totalPoints = subQuestions.reduce((sum, sq) => sum + sq.points, 0)
-      onSave({
-        question_text: questionText,
-        points: totalPoints,
-        sub_questions: subQuestions,
-        keywords: keywords.length > 0 ? keywords : undefined,
-        model_answer: modelAnswer.trim() || undefined,
-        is_draft: false,
-      })
     } else {
-      if (points < 1) return toast.error('Points must be at least 1')
-      if (points > 50) return toast.error('Points cannot exceed 50')
-      onSave({
-        question_text: questionText,
-        points,
-        keywords: keywords.length > 0 ? keywords : undefined,
-        model_answer: modelAnswer.trim() || undefined,
-        is_draft: false,
-      })
+      if (points <= 0) return toast.error('Points must be greater than 0')
+      if (points > 100) return toast.error('Points cannot exceed 100')
     }
+
+    setIsSubmitting(true)
+    onSave({
+      question_text: questionText.trim(),
+      points: calculatedPoints,
+      sub_questions: useSubQuestions ? subQuestions : [],
+      keywords: keywords.length > 0 ? keywords : undefined,
+      model_answer: modelAnswer.trim() || undefined,
+      image_url: imageUrl || null,
+      image_caption: imageCaption || null,
+      is_draft: false,
+    })
+    setTimeout(() => setIsSubmitting(false), 400)
   }
 
   const complete = isQuestionComplete()
   const totalSubQuestionPoints = subQuestions.reduce(
-    (sum, sq) => sum + sq.points,
+    (sum, sq) => sum + (sq.points || 0),
     0
   )
+  const currentTotalMarks = useSubQuestions ? totalSubQuestionPoints : points
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 flex-wrap text-slate-900 dark:text-slate-100">
-            {initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}
-            {initialData?.is_draft && (
-              <Badge
-                variant="outline"
-                className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-900/30"
-              >
-                📝 Draft
-              </Badge>
-            )}
-            {marksPerTheoryQuestion > 0 && !initialData?.id && (
-              <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0 text-[10px]">
-                {marksPerTheoryQuestion.toFixed(2)} marks each
-              </Badge>
-            )}
-            {totalTheoryMarks > 0 && (
-              <Badge
-                variant="outline"
-                className="text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 text-[10px]"
-              >
-                Theory: {totalTheoryMarks} marks total
-              </Badge>
-            )}
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-4 flex-wrap gap-2">
+            <DialogTitle className="flex items-center gap-2 flex-wrap text-slate-900 dark:text-slate-100 text-lg">
+              {initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}
+              {initialData?.is_draft && (
+                <Badge
+                  variant="outline"
+                  className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                >
+                  📝 Draft
+                </Badge>
+              )}
+              {complete && !initialData?.is_draft && (
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0">
+                  ✅ Complete
+                </Badge>
+              )}
+            </DialogTitle>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPreview(!showPreview)}
+              className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs gap-1.5 h-8"
+            >
+              {showPreview ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5" /> Edit Mode
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5 text-purple-500" /> Live Preview
+                </>
+              )}
+            </Button>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5 py-4">
+        <div className="space-y-5 py-3">
           {/* Marks summary bar */}
-          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Marks:
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Score Allocation:
             </span>
+            <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0 font-bold">
+              Current: {currentTotalMarks} marks
+            </Badge>
             {marksPerTheoryQuestion > 0 && (
               <Badge
                 variant="outline"
-                className="text-xs bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/50 text-purple-700 dark:text-purple-400"
+                className="text-xs bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/50 text-purple-700 dark:text-purple-400"
               >
-                Per question: {marksPerTheoryQuestion.toFixed(2)}mk
+                Suggested: {marksPerTheoryQuestion.toFixed(1)} marks
               </Badge>
             )}
             {totalTheoryMarks > 0 && (
               <Badge
                 variant="outline"
-                className="text-xs bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400"
+                className="text-xs bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400"
               >
-                Theory total: {totalTheoryMarks}mk
+                Theory Total: {totalTheoryMarks} marks
               </Badge>
             )}
             {examTotal > 0 && (
               <Badge
                 variant="outline"
-                className="text-xs bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
+                className="text-xs bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400"
               >
-                Exam total: {examTotal}mk
-              </Badge>
-            )}
-            {useSubQuestions && subQuestions.length > 0 && (
-              <Badge
-                variant="outline"
-                className="text-xs bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400"
-              >
-                Sub-questions: {subQuestions.length}
+                Exam Total: {examTotal} marks
               </Badge>
             )}
           </div>
@@ -304,10 +467,10 @@ export function TheoryQuestionFormDialog({
           {!complete && (
             <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/50">
               <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-              <AlertDescription className="text-amber-700 dark:text-amber-400 text-sm">
+              <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
                 {useSubQuestions
-                  ? 'Add sub-questions and points to mark as complete.'
-                  : 'Add points to mark as complete.'}
+                  ? 'Add question text, sub-questions, and marks to complete.'
+                  : 'Add question text and marks to mark as complete.'}
               </AlertDescription>
             </Alert>
           )}
@@ -315,252 +478,425 @@ export function TheoryQuestionFormDialog({
           {complete && (
             <Alert className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
-              <AlertDescription className="text-emerald-700 dark:text-emerald-400 text-sm">
-                ✓ Question is complete and ready for the exam.
+              <AlertDescription className="text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-1.5">
+                <FileCheck className="h-4 w-4" /> Theory question is complete and ready.
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Single vs Multi toggle */}
-          <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit border border-slate-200 dark:border-slate-700">
-            <Button
-              type="button"
-              size="sm"
-              variant={!useSubQuestions ? 'default' : 'ghost'}
-              onClick={() => setUseSubQuestions(false)}
-              className={cn(
-                'h-8',
-                !useSubQuestions &&
-                  'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm'
-              )}
-            >
-              Single Question
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={useSubQuestions ? 'default' : 'ghost'}
-              onClick={() => setUseSubQuestions(true)}
-              className={cn(
-                'h-8',
-                useSubQuestions &&
-                  'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm'
-              )}
-            >
-              <Layers className="h-3 w-3 mr-1" />
-              Multi-part Question
-            </Button>
-          </div>
-
-          {/* Question text */}
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Question Text *
-            </Label>
-            <Textarea
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="Enter your question here..."
-              className="min-h-[120px] mt-1.5 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-            />
-          </div>
-
-          {!useSubQuestions ? (
-            <>
-              <div>
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Points
-                </Label>
-                <Input
-                  type="number"
-                  value={points}
-                  onChange={(e) =>
-                    setPoints(
-                      parseInt(e.target.value) ||
-                        (marksPerTheoryQuestion > 0
-                          ? marksPerTheoryQuestion
-                          : 10)
-                    )
-                  }
-                  min={1}
-                  max={50}
-                  className="mt-1.5 w-32 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                />
-                {marksPerTheoryQuestion > 0 && (
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    Suggested: {marksPerTheoryQuestion.toFixed(2)} marks per
-                    question
-                  </p>
-                )}
+          {/* LIVE PREVIEW CARD */}
+          {showPreview ? (
+            <div className="p-4 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/20 dark:bg-purple-950/20 space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-purple-100 dark:border-purple-900/40">
+                <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                  Theory Question Preview
+                </span>
+                <Badge variant="secondary" className="font-bold text-xs">
+                  {currentTotalMarks} Marks Total
+                </Badge>
               </div>
 
-              <div>
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Keywords (for grading)
-                </Label>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
-                  Add keywords that should be present in student answers for
-                  partial credit
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    value={keywordInput}
-                    onChange={(e) => setKeywordInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="e.g., photosynthesis, energy, sunlight"
-                    className="flex-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddKeyword}
-                    size="sm"
-                    className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {keywords.map((keyword) => (
-                      <Badge
-                        key={keyword}
-                        variant="secondary"
-                        className="gap-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+              <QuestionContent
+                text={questionText || '_No question text provided yet_'}
+                imageUrl={imageUrl}
+                imageCaption={imageCaption}
+              />
+
+              {useSubQuestions && subQuestions.length > 0 && (
+                <div className="space-y-2.5 pt-3 border-t border-purple-100 dark:border-purple-900/30">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Sub-questions ({subQuestions.length}):
+                  </span>
+                  <div className="space-y-2">
+                    {subQuestions.map((sq, i) => (
+                      <div
+                        key={sq.id || i}
+                        className="p-3 rounded-lg border border-purple-200 dark:border-purple-900/40 bg-white dark:bg-slate-900 space-y-1.5"
                       >
-                        {keyword}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveKeyword(keyword)}
-                          className="ml-1 hover:text-red-500"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 flex-1">
+                            <span className="font-bold text-purple-600 dark:text-purple-400 text-sm">
+                              ({String.fromCharCode(97 + i)})
+                            </span>
+                            <div className="flex-1">
+                              <QuestionContent
+                                text={getSubText(sq) || '_No sub-question text_'}
+                              />
+                            </div>
+                          </div>
+                          <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0 text-xs shrink-0">
+                            {sq.points || 0} marks
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {modelAnswer && (
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50 space-y-1">
+                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Model Answer / Marking Scheme
+                  </span>
+                  <QuestionContent text={modelAnswer} />
+                </div>
+              )}
+
+              {keywords.length > 0 && (
+                <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/50 space-y-1.5">
+                  <span className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" /> Grading Keywords
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {keywords.map((kw) => (
+                      <Badge
+                        key={kw}
+                        variant="outline"
+                        className="bg-white dark:bg-slate-950 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs"
+                      >
+                        {kw}
                       </Badge>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Single vs Multi toggle */}
+              <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit border border-slate-200 dark:border-slate-700">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!useSubQuestions ? 'default' : 'ghost'}
+                  onClick={() => setUseSubQuestions(false)}
+                  className={cn(
+                    'h-8 text-xs font-semibold',
+                    !useSubQuestions
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400'
+                  )}
+                >
+                  Single Question
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={useSubQuestions ? 'default' : 'ghost'}
+                  onClick={() => setUseSubQuestions(true)}
+                  className={cn(
+                    'h-8 text-xs font-semibold',
+                    useSubQuestions
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400'
+                  )}
+                >
+                  <Layers className="h-3.5 w-3.5 mr-1" />
+                  Multi-part Question (a, b, c)
+                </Button>
+              </div>
+
+              {/* Main Question Text with Universal Table Paste */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Question Text <span className="text-red-500">*</span>
+                  </Label>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                    <TableIcon className="h-3 w-3 text-purple-500" />
+                    Auto-formats tables from Excel/Word
+                  </span>
+                </div>
+                <Textarea
+                  value={questionText}
+                  onChange={(e) => setQuestionText(e.target.value)}
+                  onPaste={(e) => handleTablePaste(e, setQuestionText)}
+                  placeholder="Enter the main question text or instructions here... (Paste Excel/Word tables directly)"
+                  className="min-h-[110px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-sans"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              {/* Diagram / Image Attachment */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 bg-slate-50/50 dark:bg-slate-950/40">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
+                    Question Diagram / Illustration (Optional)
+                  </Label>
+                  {imageUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      className="h-6 px-2 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" /> Remove Diagram
+                    </Button>
+                  )}
+                </div>
+
+                {imageUrl ? (
+                  <div className="space-y-2">
+                    <div className="relative rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 text-center max-w-sm mx-auto">
+                      <img
+                        src={imageUrl}
+                        alt="Question diagram"
+                        className="max-h-36 mx-auto object-contain rounded"
+                      />
+                    </div>
+                    <Input
+                      value={imageCaption}
+                      onChange={(e) => setImageCaption(e.target.value)}
+                      placeholder="Add an optional diagram caption (e.g. Figure 1: Circuit Diagram)"
+                      className="text-xs h-8 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploadingImage || isSubmitting}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs h-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                    >
+                      {isUploadingImage ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
+                      )}
+                      {isUploadingImage ? 'Uploading...' : 'Upload Diagram'}
+                    </Button>
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Supports JPG, PNG, WebP & SVG
+                    </span>
+                  </div>
                 )}
               </div>
 
-              <div>
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Model Answer (Optional)
-                </Label>
-                <Textarea
-                  value={modelAnswer}
-                  onChange={(e) => setModelAnswer(e.target.value)}
-                  placeholder="Enter a model answer or grading rubric..."
-                  className="min-h-[100px] mt-1.5 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Sub-questions *
-                  </Label>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleAddSubQuestion}
-                    className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                  >
-                    <Plus className="h-3 w-3 mr-1" /> Add Sub-question
-                  </Button>
-                </div>
+              {/* SINGLE QUESTION MODE */}
+              {!useSubQuestions ? (
+                <>
+                  <div>
+                    <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Question Points / Marks <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      value={points}
+                      onChange={(e) =>
+                        setPoints(parseFloat(e.target.value) || 0)
+                      }
+                      min={0.5}
+                      step={0.5}
+                      className="mt-1.5 w-32 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
+                      disabled={isSubmitting}
+                    />
+                  </div>
 
-                {subQuestions.length === 0 ? (
-                  <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      No sub-questions added yet
+                  <div>
+                    <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Grading Keywords (Optional)
+                    </Label>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
+                      Add keywords used for rubric evaluation and student feedback.
                     </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                      Add sub-questions like (a), (b), (c) with their own points
-                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="e.g., mitochondria, atp, cellular respiration"
+                        className="flex-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
+                        disabled={isSubmitting}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddKeyword}
+                        size="sm"
+                        className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                        disabled={isSubmitting}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        {keywords.map((keyword) => (
+                          <Badge
+                            key={keyword}
+                            variant="secondary"
+                            className="gap-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs py-1"
+                          >
+                            {keyword}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveKeyword(keyword)}
+                              className="ml-1 hover:text-red-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Model Answer / Marking Scheme (Optional)
+                      </Label>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                        <TableIcon className="h-3 w-3 text-purple-500" />
+                        Table paste supported
+                      </span>
+                    </div>
+                    <Textarea
+                      value={modelAnswer}
+                      onChange={(e) => setModelAnswer(e.target.value)}
+                      onPaste={(e) => handleTablePaste(e, setModelAnswer)}
+                      placeholder="Enter a model answer or key grading criteria..."
+                      className="min-h-[100px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-sans"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </>
+              ) : (
+                /* MULTI-PART SUB-QUESTIONS MODE */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Brain className="h-4 w-4 text-purple-500" />
+                      Sub-questions <span className="text-red-500">*</span>
+                    </Label>
                     <Button
                       type="button"
-                      variant="link"
                       size="sm"
+                      variant="outline"
                       onClick={handleAddSubQuestion}
-                      className="text-blue-600 dark:text-blue-400"
+                      className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs h-8"
+                      disabled={isSubmitting}
                     >
-                      Add your first sub-question
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Sub-question
                     </Button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {subQuestions.map((sq, idx) => (
-                      <div
-                        key={sq.id}
-                        className="p-4 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900/50"
+
+                  {subQuestions.length === 0 ? (
+                    <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950/20">
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                        No sub-questions added yet
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                        Add structured sub-questions like (a), (b), (c) with individual marks
+                      </p>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={handleAddSubQuestion}
+                        className="text-purple-600 dark:text-purple-400 mt-2"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="font-medium text-slate-800 dark:text-slate-200">
-                            Sub-question {String.fromCharCode(97 + idx)}
-                          </Label>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSubQuestion(idx)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Textarea
-                          value={getSubText(sq)}
-                          onChange={(e) =>
-                            handleUpdateSubQuestion(idx, {
-                              question_text: e.target.value,
-                            })
-                          }
-                          placeholder={`Enter sub-question ${String.fromCharCode(
-                            97 + idx
-                          )}`}
-                          className="min-h-[60px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
-                        />
-                        <div className="mt-2">
-                          <Label className="text-xs text-slate-600 dark:text-slate-400">
-                            Points
-                          </Label>
-                          <Input
-                            type="number"
-                            value={sq.points}
+                        + Add your first sub-question
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {subQuestions.map((sq, idx) => (
+                        <div
+                          key={sq.id || idx}
+                          className="p-3.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 space-y-2.5 shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                              Part ({String.fromCharCode(97 + idx)})
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteSubQuestion(idx)}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              disabled={isSubmitting}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <Textarea
+                            value={getSubText(sq)}
                             onChange={(e) =>
                               handleUpdateSubQuestion(idx, {
-                                points: parseInt(e.target.value) || 1,
+                                question_text: e.target.value,
+                                text: e.target.value,
                               })
                             }
-                            min={1}
-                            className="w-24 mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
+                            onPaste={(e) =>
+                              handleTablePaste(e, (val: string) =>
+                                handleUpdateSubQuestion(idx, {
+                                  question_text: val,
+                                  text: val,
+                                })
+                              )
+                            }
+                            placeholder={`Enter sub-question (${String.fromCharCode(
+                              97 + idx
+                            )}) text... (Paste tables directly)`}
+                            className="min-h-[65px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm font-sans"
+                            disabled={isSubmitting}
                           />
-                        </div>
-                      </div>
-                    ))}
 
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg mt-3 border border-slate-100 dark:border-slate-800">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          Total Points:
+                          <div className="flex items-center justify-between pt-1">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                Marks:
+                              </Label>
+                              <Input
+                                type="number"
+                                value={sq.points}
+                                onChange={(e) =>
+                                  handleUpdateSubQuestion(idx, {
+                                    points: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                min={0.5}
+                                step={0.5}
+                                className="w-20 h-7 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
+                                disabled={isSubmitting}
+                              />
+                            </div>
+                            <span className="text-[11px] text-slate-400">
+                              Sub-part {String.fromCharCode(97 + idx)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Sub-questions points summary */}
+                      <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-800/40 flex items-center justify-between text-xs sm:text-sm">
+                        <span className="font-semibold text-purple-900 dark:text-purple-300">
+                          Total Sub-questions Marks:
                         </span>
-                        <span className="font-bold text-purple-600 dark:text-purple-400">
+                        <span className="font-bold text-purple-700 dark:text-purple-300">
                           {totalSubQuestionPoints} marks
                         </span>
                       </div>
-                      {marksPerTheoryQuestion > 0 && (
-                        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-1">
-                          <span>Per question:</span>
-                          <span>{marksPerTheoryQuestion.toFixed(2)} marks</span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -569,6 +905,7 @@ export function TheoryQuestionFormDialog({
           <Button
             variant="outline"
             onClick={handleClose}
+            disabled={isSubmitting}
             className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
           >
             Cancel
@@ -576,17 +913,19 @@ export function TheoryQuestionFormDialog({
           <Button
             variant="secondary"
             onClick={() => handleSubmit(true)}
-            disabled={!questionText.trim()}
-            className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700"
+            disabled={!questionText.trim() || isSubmitting}
+            className="gap-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700"
           >
-            Save as Draft
+            <Save className="h-4 w-4" />
+            {initialData?.id ? 'Save Changes as Draft' : 'Save as Draft'}
           </Button>
           <Button
             onClick={() => handleSubmit(false)}
-            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white"
-            disabled={!complete}
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-medium shadow-sm gap-2"
+            disabled={!complete || isSubmitting}
           >
-            {initialData?.id ? 'Update' : 'Add'} Complete Question
+            <FileCheck className="h-4 w-4" />
+            {initialData?.id ? 'Update Complete' : 'Add Complete Question'}
           </Button>
         </DialogFooter>
       </DialogContent>

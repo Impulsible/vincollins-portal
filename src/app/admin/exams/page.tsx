@@ -1,7 +1,7 @@
-// app/admin/exams/page.tsx - FULLY DARK MODE WITH TABLE & DIAGRAM RENDERING
+// src/app/admin/exams/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,17 +19,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   Loader2, RefreshCw, Eye, CheckCircle, XCircle, FileText,
-  Users, ChevronDown, AlertCircle,
-  Search, Clock, CheckCircle2,
-  LayoutGrid, List, GraduationCap, BookOpen,
-  ChevronLeft, ChevronRight as ChevronRightIcon,
-  Sparkles, Shield,
-  RotateCcw, Edit3, Archive, Send, User, Trash2,
-  X, PenTool, HelpCircle, Hash,
-  Timer, Target, Layers, Hourglass, Plus, Image as ImageIcon
+  Users, ChevronDown, AlertCircle, Search, Clock, CheckCircle2,
+  LayoutGrid, List, GraduationCap, BookOpen, ChevronLeft,
+  ChevronRight as ChevronRightIcon, Sparkles, Shield, RotateCcw,
+  Edit3, Archive, Send, User, Trash2, X, PenTool, HelpCircle,
+  Hash, Timer, Target, Layers, Hourglass, Image as ImageIcon,
+  UserCheck, UserPlus, Ban, AlertTriangle,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
 interface TheorySubQuestion {
   text: string
   marks: number
@@ -41,6 +40,7 @@ interface TheorySubQuestion {
 }
 
 interface TheoryQuestion {
+  question_text: string
   id: string
   question: string
   marks: number
@@ -56,18 +56,26 @@ interface Exam {
   id: string
   title: string
   subject: string
+  subject_id?: string
   class: string
+  class_id?: string
   duration: number
+  duration_minutes?: number
   total_questions: number
   total_marks: number
   pass_mark?: number
   passing_percentage?: number
-  status: string
+  status: 'draft' | 'pending' | 'submitted' | 'approved' | 'published' | 'archived'
   is_published?: boolean
   is_active?: boolean
   is_archived?: boolean
   published_at?: string
   published_by?: string
+  approved_at?: string
+  approved_by?: string
+  review_notes?: string
+  rejection_reason?: string
+  excluded_student_ids?: string[]
   starts_at?: string
   term?: string
   session_year?: string
@@ -88,6 +96,8 @@ interface Student {
   full_name: string
   class: string
   admission_number?: string
+  email?: string
+  selected?: boolean
 }
 
 interface ExamAttempt {
@@ -100,6 +110,7 @@ interface ExamAttempt {
   submitted_at?: string
   extra_time_minutes?: number
   extra_time_updated_at?: string | null
+  time_remaining_seconds?: number
   is_auto_submitted?: boolean | null
   created_at?: string
   profiles?: {
@@ -110,6 +121,14 @@ interface ExamAttempt {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Normalize a class string to a canonical year:
+ *   "JSS1", "JSS 1", "JSS 1A", "JSS 1 Science"  → "JSS 1"
+ *   "SS1",  "SS 1",  "SS1 Science", "SS 1 Arts"  → "SS 1"
+ */
 const extractYear = (cls: string): string => {
   if (!cls) return ''
   const n = cls.trim().toUpperCase().replace(/\s/g, '')
@@ -122,11 +141,61 @@ const extractYear = (cls: string): string => {
   return cls
 }
 
+/**
+ * Extract department from a class string:
+ *   "SS1 Science"  → "science"
+ *   "SS1 Arts"     → "arts"
+ *   "SS1 Commercial" → "commercial"
+ *   "SS1" / "JSS 1" → null
+ */
+const extractDept = (cls: string): 'science' | 'arts' | 'commercial' | null => {
+  if (!cls) return null
+  const lower = cls.toLowerCase()
+  if (lower.includes('science')) return 'science'
+  if (lower.includes('arts')) return 'arts'
+  if (lower.includes('commercial')) return 'commercial'
+  return null
+}
+
+/**
+ * THE UNIVERSAL MATCHER.
+ *
+ * Given an exam's class and the full student list, return the students
+ * who belong in that exam's attendance checklist.
+ *
+ *   exam.class = "JSS 1"           → all JSS 1 students
+ *   exam.class = "SS1"             → all SS1 students (Arts + Science + Commercial)
+ *   exam.class = "SS1 Science"     → only SS1 Science students
+ *   exam.class = "SS1 Arts"        → only SS1 Arts students
+ *   exam.class = "SS1 Commercial"  → only SS1 Commercial students
+ *   exam.class = "SS3"             → all SS3 students
+ *
+ * Case-insensitive, whitespace-insensitive, robust to "SS1", "SS 1", "ss1".
+ */
+const matchStudentsByExamClass = (examClass: string, students: Student[]): Student[] => {
+  const examYear = extractYear(examClass)
+  const examDept = extractDept(examClass)
+
+  if (!examYear) return []
+
+  return students.filter(s => {
+    // Must match the year first
+    if (extractYear(s.class) !== examYear) return false
+    // If exam specifies a department, student must be in that department
+    if (examDept) {
+      return extractDept(s.class) === examDept
+    }
+    // No department specified → include everyone in that year
+    return true
+  })
+}
+
 const getExamDept = (exam: Exam): string => {
   if (exam.target_audience && exam.target_audience !== 'all') return exam.target_audience
-  if (exam.class?.includes('Science')) return 'Science'
-  if (exam.class?.includes('Arts')) return 'Arts'
-  if (exam.class?.includes('Commercial')) return 'Commercial'
+  const d = extractDept(exam.class)
+  if (d === 'science') return 'Science'
+  if (d === 'arts') return 'Arts'
+  if (d === 'commercial') return 'Commercial'
   return 'All Students'
 }
 
@@ -149,38 +218,22 @@ const TERMINAL_ATTEMPT_STATUSES = [
 ] as const
 
 const isAttemptExtendable = (a: ExamAttempt): boolean =>
-  a.status === 'in_progress' && a.is_auto_submitted !== true
+  (a.status === 'in_progress' || a.status === 'started') && a.is_auto_submitted !== true
 
 const formatDateShort = (d: string) => {
   if (!d) return 'N/A'
   return new Date(d).toLocaleDateString('en-NG', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const formatDateTime = (d: string) => {
-  if (!d) return 'N/A'
-  return new Date(d).toLocaleString('en-NG', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-  })
-}
-
-const computeEffectiveEndMs = (
-  startedAt: string | undefined,
-  durationMinutes: number,
-  extraMinutes: number,
-): number | null => {
-  if (!startedAt) return null
-  const startMs = new Date(startedAt).getTime()
-  if (!Number.isFinite(startMs)) return null
-  const dur = Math.max(0, Number(durationMinutes) || 0)
-  const extra = Math.max(0, Number(extraMinutes) || 0)
-  return startMs + (dur + extra) * 60_000
-}
-
 const fetchCurrentTerm = async (): Promise<{ term: string; session_year: string }> => {
-  const { data, error } = await supabase
-    .from('terms').select('term_code, session_year').eq('is_current', true).maybeSingle()
-  if (error || !data?.term_code) throw new Error('No current term set.')
-  return { term: data.term_code, session_year: data.session_year }
+  try {
+    const { data, error } = await supabase
+      .from('terms').select('term_code, session_year').eq('is_current', true).maybeSingle()
+    if (error || !data?.term_code) return { term: 'first', session_year: '2024/2025' }
+    return { term: data.term_code, session_year: data.session_year }
+  } catch {
+    return { term: 'first', session_year: '2024/2025' }
+  }
 }
 
 const normTerm = (t?: string | null) => {
@@ -216,11 +269,13 @@ const ClassBadge = ({ cls }: { cls: string }) => {
 
 const statusConfig: Record<string, { label: string; icon: any; cls: string }> = {
   published: { label: 'Published', icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
+  approved:  { label: 'Approved',  icon: CheckCircle,  cls: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
   pending:   { label: 'Pending',   icon: Clock,        cls: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
   draft:     { label: 'Draft',     icon: FileText,     cls: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' },
-  submitted: { label: 'Submitted', icon: Send,         cls: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
+  submitted: { label: 'Submitted', icon: Send,         cls: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
   rejected:  { label: 'Rejected',  icon: XCircle,      cls: 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' },
   archived:  { label: 'Archived',  icon: Archive,      cls: 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
+  terminated:{ label: 'Terminated',icon: Ban,          cls: 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30' },
 }
 
 const StatusPill = ({ status }: { status: string }) => {
@@ -235,6 +290,7 @@ const StatusPill = ({ status }: { status: string }) => {
 
 const attemptStatusConfig: Record<string, { label: string; cls: string }> = {
   in_progress:    { label: 'In Progress',    cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
+  started:        { label: 'Started',        cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
   timed_out:      { label: 'Timed Out',      cls: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' },
   completed:      { label: 'Completed',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
   submitted:      { label: 'Submitted',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
@@ -267,8 +323,8 @@ const DeptPill = ({ exam }: { exam: Exam }) => {
   )
 }
 
-// ── Theory Question Recursive Sub-question Renderer ──────────────────────────
-const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', depth: number = 0) => {
+// ── Theory Sub-question Renderer ───────────────────────────────────────────
+const renderSubQuestions = (subs: TheorySubQuestion[], depth: number = 0) => {
   const labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
   const romans = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
   return (
@@ -286,11 +342,7 @@ const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', dept
               <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <QuestionContent
-                      text={sub.text}
-                      imageUrl={subImage}
-                      imageCaption={subCaption}
-                    />
+                    <QuestionContent text={sub.text} imageUrl={subImage} imageCaption={subCaption} />
                   </div>
                   {sub.marks > 0 && (
                     <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-200 dark:ring-violet-500/30 px-2 py-0.5 rounded-full whitespace-nowrap self-start">
@@ -299,7 +351,7 @@ const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', dept
                   )}
                 </div>
                 {sub.sub_sub_questions && sub.sub_sub_questions.length > 0 && (
-                  renderSubQuestions(sub.sub_sub_questions, '', depth + 1)
+                  renderSubQuestions(sub.sub_sub_questions, depth + 1)
                 )}
               </div>
             </div>
@@ -310,7 +362,7 @@ const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', dept
   )
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Main Page Component ────────────────────────────────────────────────────────
 export default function AdminExamsPage() {
   const [loading, setLoading]       = useState(true)
   const [exams, setExams]           = useState<Exam[]>([])
@@ -318,7 +370,7 @@ export default function AdminExamsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [currentTermInfo, setCurrentTermInfo] = useState<{ term: string; session_year: string } | null>(null)
 
-  const [activeTab, setActiveTab]           = useState<'pending' | 'published' | 'archived'>('pending')
+  const [activeTab, setActiveTab]           = useState<'pending' | 'approved' | 'published' | 'archived'>('pending')
   const [searchQuery, setSearchQuery]       = useState('')
   const [selectedClass, setSelectedClass]   = useState('all')
   const [selectedDept, setSelectedDept]     = useState('all')
@@ -326,63 +378,94 @@ export default function AdminExamsPage() {
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set(CLASS_ORDER))
 
   // Modals
-  const [selectedExam, setSelectedExam] = useState<Exam | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
-  const [showApprove, setShowApprove] = useState(false)
-  const [showReject, setShowReject] = useState(false)
-  const [showRetry, setShowRetry] = useState(false)
-  const [showReturn, setShowReturn] = useState(false)
-  const [showArchive, setShowArchive] = useState(false)
-  const [showDelete, setShowDelete] = useState(false)
-  const [showExtraTime, setShowExtraTime] = useState(false)
+  const [selectedExam, setSelectedExam]       = useState<Exam | null>(null)
+  const [showPreview, setShowPreview]         = useState(false)
+  const [showApprove, setShowApprove]         = useState(false)
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [showAdmitLateModal, setShowAdmitLateModal] = useState(false)
+  const [showBlockModal, setShowBlockModal]   = useState(false)
+  const [showReject, setShowReject]           = useState(false)
+  const [showRetry, setShowRetry]             = useState(false)
+  const [showReturn, setShowReturn]           = useState(false)
+  const [showArchive, setShowArchive]         = useState(false)
+  const [showDelete, setShowDelete]           = useState(false)
+  const [showExtraTime, setShowExtraTime]     = useState(false)
 
   // Form states
   const [rejectionReason, setRejectionReason] = useState('')
-  const [returnReason, setReturnReason] = useState('')
-  const [processing, setProcessing] = useState(false)
+  const [returnReason, setReturnReason]       = useState('')
+  const [processing, setProcessing]           = useState(false)
 
-  // Retry states
-  const [retryScope, setRetryScope] = useState<'class' | 'individual'>('class')
-  const [allStudents, setAllStudents] = useState<Student[]>([])
-  const [studentsByClass, setStudentsByClass] = useState<Record<string, Student[]>>({})
+  // Attendance Checklist
+  const [classStudents, setClassStudents]     = useState<Student[]>([])
+  const [loadingAttendance, setLoadingAttendance] = useState(false)
+  const [attendanceSearch, setAttendanceSearch]   = useState('')
+  const [attendanceTouched, setAttendanceTouched] = useState(false)
+
+  // Late / Absent
+  const [absentStudentsList, setAbsentStudentsList] = useState<Student[]>([])
+  const [loadingAbsentStudents, setLoadingAbsentStudents] = useState(false)
+
+  // Block
+  const [blockCandidates, setBlockCandidates] = useState<ExamAttempt[]>([])
+  const [loadingBlockCandidates, setLoadingBlockCandidates] = useState(false)
+  const [blockSelectedIds, setBlockSelectedIds] = useState<Set<string>>(new Set())
+  const [blockSearch, setBlockSearch] = useState('')
+
+  // Retry
+  const [retryScope, setRetryScope]                 = useState<'class' | 'individual'>('class')
+  const [allStudents, setAllStudents]               = useState<Student[]>([])
+  const [studentsByClass, setStudentsByClass]       = useState<Record<string, Student[]>>({})
   const [retrySelectedClass, setRetrySelectedClass] = useState<string>('')
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
-  const [studentSearch, setStudentSearch] = useState('')
-  const [loadingStudents, setLoadingStudents] = useState(false)
-  const [attemptCounts, setAttemptCounts] = useState<Record<string, number>>({})
+  const [studentSearch, setStudentSearch]           = useState('')
+  const [loadingStudents, setLoadingStudents]       = useState(false)
+  const [attemptCounts, setAttemptCounts]           = useState<Record<string, number>>({})
   const [expandedRetryClasses, setExpandedRetryClasses] = useState<Set<string>>(new Set())
 
-  // Extra time states
-  const [extraTimeAttempts, setExtraTimeAttempts] = useState<ExamAttempt[]>([])
-  const [loadingAttempts, setLoadingAttempts] = useState(false)
-  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
-  const [extraMinutes, setExtraMinutes] = useState<number>(10)
-  const [customMinutes, setCustomMinutes] = useState<string>('')
-  const [extraTimeSearch, setExtraTimeSearch] = useState('')
+  // Extra time
+  const [extraTimeAttempts, setExtraTimeAttempts]   = useState<ExamAttempt[]>([])
+  const [loadingAttempts, setLoadingAttempts]       = useState(false)
+  const [selectedAttemptId, setSelectedAttemptId]   = useState<string | null>(null)
+  const [extraMinutes, setExtraMinutes]             = useState<number>(10)
+  const [customMinutes, setCustomMinutes]           = useState<string>('')
+  const [extraTimeSearch, setExtraTimeSearch]       = useState('')
 
-  // Preview states
-  const [previewTab, setPreviewTab] = useState<'objective' | 'theory' | 'info'>('info')
-  const [examQs, setExamQs] = useState<any[]>([])
-  const [theoryQs, setTheoryQs] = useState<TheoryQuestion[]>([])
-  const [loadingQs, setLoadingQs] = useState(false)
-  const [currentQIdx, setCurrentQIdx] = useState(0)
-  const [currentTheoryIdx, setCurrentTheoryIdx] = useState(0)
+  // Preview
+  const [previewTab, setPreviewTab]                 = useState<'objective' | 'theory' | 'info'>('info')
+  const [examQs, setExamQs]                         = useState<any[]>([])
+  const [theoryQs, setTheoryQs]                     = useState<TheoryQuestion[]>([])
+  const [loadingQs, setLoadingQs]                   = useState(false)
+  const [currentQIdx, setCurrentQIdx]               = useState(0)
+  const [currentTheoryIdx, setCurrentTheoryIdx]     = useState(0)
+
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-        if (data) setProfile(data)
+        if (data && mountedRef.current) setProfile(data)
       }
-      try { setCurrentTermInfo(await fetchCurrentTerm()) } catch (e: any) { console.error(e.message) }
+      try {
+        const term = await fetchCurrentTerm()
+        if (mountedRef.current) setCurrentTermInfo(term)
+      } catch (e: any) {
+        console.error(e.message)
+      }
     }
     init()
   }, [])
 
   const loadExams = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('exams').select('*').order('created_at', { ascending: false }).limit(500)
+      const { data, error } = await supabase
+        .from('exams').select('*').order('created_at', { ascending: false }).limit(500)
       if (error) throw error
 
       const creatorIds = Array.from(new Set((data || []).map((e: any) => e.created_by).filter(Boolean)))
@@ -392,12 +475,21 @@ export default function AdminExamsPage() {
         teacherMap = (teachers || []).reduce((acc: any, t: any) => { acc[t.id] = t.full_name; return acc }, {})
       }
 
+      if (!mountedRef.current) return
       setExams((data || []).map((e: any) => ({
         ...e,
-        teacher_name: teacherMap[e.created_by] || e.teacher_name || 'Unknown Teacher',
+        teacher_name: teacherMap[e.created_by] || e.teacher_name || 'Staff Member',
+        duration: e.duration || e.duration_minutes || 60,
+        excluded_student_ids: Array.isArray(e.excluded_student_ids) ? e.excluded_student_ids : [],
       })))
-    } catch { toast.error('Failed to load exams') }
-    finally { setLoading(false); setRefreshing(false) }
+    } catch {
+      toast.error('Failed to load exams')
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    }
   }, [])
 
   useEffect(() => { loadExams() }, [loadExams])
@@ -411,51 +503,268 @@ export default function AdminExamsPage() {
     setPreviewTab('info')
     try {
       const { data } = await supabase.from('exams').select('questions, theory_questions, has_theory').eq('id', exam.id).single()
+      let qs: any[] = typeof data?.questions === 'string' ? JSON.parse(data.questions) : (data?.questions || [])
+      let tqs: any[] = typeof data?.theory_questions === 'string' ? JSON.parse(data.theory_questions) : (data?.theory_questions || [])
 
-      const qs = typeof data?.questions === 'string' ? JSON.parse(data.questions) : (data?.questions || [])
-      const tqs = typeof data?.theory_questions === 'string' ? JSON.parse(data.theory_questions) : (data?.theory_questions || [])
+      if (!Array.isArray(qs) || qs.length === 0) {
+        const { data: objRes } = await supabase.from('questions').select('*').eq('exam_id', exam.id).order('order_index', { ascending: true })
+        if (objRes && objRes.length > 0) qs = objRes
+      }
+      if (!Array.isArray(tqs) || tqs.length === 0) {
+        const { data: thRes } = await supabase.from('theory_questions').select('*').eq('exam_id', exam.id).order('order_index', { ascending: true })
+        if (thRes && thRes.length > 0) tqs = thRes
+      }
 
+      if (!mountedRef.current) return
       setExamQs(Array.isArray(qs) ? qs : [])
       setTheoryQs(Array.isArray(tqs) ? tqs : [])
-
       if (Array.isArray(qs) && qs.length > 0) setPreviewTab('objective')
       else if (Array.isArray(tqs) && tqs.length > 0) setPreviewTab('theory')
       else setPreviewTab('info')
     } catch {
       toast.error('Failed to load questions')
-      setExamQs([])
-      setTheoryQs([])
+      if (mountedRef.current) { setExamQs([]); setTheoryQs([]) }
+    } finally {
+      if (mountedRef.current) setLoadingQs(false)
     }
-    finally { setLoadingQs(false) }
   }
 
-  // 🛠️ ACTIONS
-  const handleApprove = async () => {
+  // ── APPROVE ────────────────────────────────────────────────────────────
+  const handleApproveOnly = async () => {
     if (!selectedExam) return
+    setProcessing(true)
+    try {
+      const now = new Date().toISOString()
+      const { error } = await supabase.from('exams').update({
+        status: 'approved', approved_at: now, approved_by: profile?.id || null, review_notes: null,
+      }).eq('id', selectedExam.id)
+
+      if (error) {
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('approved_at') || msg.includes('column') || error.code === 'PGRST204') {
+          const { error: fbErr } = await supabase.from('exams').update({ status: 'approved' }).eq('id', selectedExam.id)
+          if (fbErr) throw fbErr
+        } else {
+          throw error
+        }
+      }
+
+      toast.success(`Exam "${selectedExam.title}" approved! It is ready to be published.`)
+      setShowApprove(false); setSelectedExam(null)
+      await loadExams(); setActiveTab('approved')
+    } catch (err: any) {
+      toast.error(err.message || 'Approval failed')
+    } finally { setProcessing(false) }
+  }
+
+  // ── PUBLISH WITH ATTENDANCE ────────────────────────────────────────────
+  const openPublishModal = async (exam: Exam) => {
+    setSelectedExam(exam)
+    setAttendanceSearch('')
+    setAttendanceTouched(false)
+    setShowPublishModal(true)
+    setLoadingAttendance(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, class, email, admission_number')
+        .eq('role', 'student')
+        .eq('is_active', true)
+        .order('full_name', { ascending: true })
+
+      if (error) throw error
+
+      const allActive = (data || []) as Student[]
+
+      // Use the universal matcher — handles "SS1" (all), "SS1 Science" (dept),
+      // "SS1 Arts" (dept), "SS1 Commercial" (dept), "JSS 1" (all), etc.
+      const matched = matchStudentsByExamClass(exam.class || '', allActive)
+
+      if (matched.length === 0) {
+        console.warn('[publish] No students matched', {
+          examClass: exam.class,
+          examYear: extractYear(exam.class || ''),
+          examDept: extractDept(exam.class || ''),
+          availableClasses: Array.from(new Set(allActive.map(s => s.class))),
+        })
+        toast.error(
+          `No active students found for "${exam.class}". ` +
+          `Available classes: ${Array.from(new Set(allActive.map(s => s.class))).join(', ') || '(none)'}`
+        )
+        if (mountedRef.current) setClassStudents([])
+        return
+      }
+
+      // Everyone in the matched set starts as PRESENT. Admin unchecks the absent ones.
+      const withSelection = matched.map(s => ({ ...s, selected: true }))
+
+      if (!mountedRef.current) return
+      setClassStudents(withSelection)
+    } catch (err: any) {
+      toast.error('Could not load student list for attendance: ' + (err.message || 'unknown'))
+    } finally {
+      if (mountedRef.current) setLoadingAttendance(false)
+    }
+  }
+
+  const handlePublishWithAttendance = async () => {
+    if (!selectedExam) return
+    const presentCount = classStudents.filter(s => s.selected).length
+    if (classStudents.length === 0) {
+      toast.error('No students found for this exam class. Cannot publish.')
+      return
+    }
+    if (presentCount === 0) {
+      toast.error('No students marked present. Tick at least one student, or reject the exam.')
+      return
+    }
+
+    const excludedIds = classStudents
+      .filter(s => !s.selected)
+      .map(s => s.id)
+      .filter(id => UUID_RE.test(id))
+
     setProcessing(true)
     try {
       const { term, session_year } = await fetchCurrentTerm()
       const now = new Date().toISOString()
-      const { error } = await supabase.from('exams').update({
-        status: 'published', is_published: true, is_active: true, is_archived: false,
-        published_at: now, published_by: profile?.id, term, session_year,
-      }).eq('id', selectedExam.id)
+      const payload: Record<string, any> = {
+        status: 'published',
+        is_published: true,
+        is_active: true,
+        is_archived: false,
+        published_at: now,
+        published_by: profile?.id,
+        term,
+        session_year,
+        excluded_student_ids: excludedIds,
+      }
+      const { error } = await supabase.from('exams').update(payload).eq('id', selectedExam.id)
       if (error) throw error
-      toast.success('Exam published successfully')
-      setShowApprove(false); setSelectedExam(null); loadExams()
-    } catch (err: any) { toast.error(err.message) }
-    finally { setProcessing(false) }
+
+      toast.success(
+        `Published! Live for ${presentCount} present student${presentCount !== 1 ? 's' : ''}` +
+        (excludedIds.length > 0
+          ? ` (${excludedIds.length} absent excluded).`
+          : ' (all present).')
+      )
+      setShowPublishModal(false); setSelectedExam(null)
+      await loadExams(); setActiveTab('published')
+    } catch (err: any) {
+      toast.error(`Publishing failed: ${err.message || 'unknown error'}. Exam was NOT published.`)
+    } finally { setProcessing(false) }
   }
 
+  // ── ADMIT LATE ─────────────────────────────────────────────────────────
+  const openAdmitLateModal = async (exam: Exam) => {
+    setSelectedExam(exam)
+    setShowAdmitLateModal(true)
+    setLoadingAbsentStudents(true)
+    try {
+      const excludedIds = (exam.excluded_student_ids || []).filter(id => UUID_RE.test(id))
+      if (excludedIds.length === 0) {
+        setAbsentStudentsList([]); setLoadingAbsentStudents(false); return
+      }
+      const { data, error } = await supabase.from('profiles').select('id, full_name, class, email').in('id', excludedIds)
+      if (error) throw error
+      if (!mountedRef.current) return
+      setAbsentStudentsList((data || []).map(s => ({ ...s, selected: true })))
+    } catch {
+      toast.error('Failed to load absent students')
+    } finally {
+      if (mountedRef.current) setLoadingAbsentStudents(false)
+    }
+  }
+
+  const handleConfirmAdmitLate = async () => {
+    if (!selectedExam) return
+    const admittedIds = absentStudentsList.filter(s => s.selected).map(s => s.id)
+    if (admittedIds.length === 0) { toast.error('Select at least one arriving student to admit.'); return }
+    const currentExcluded = (selectedExam.excluded_student_ids || []).filter(id => UUID_RE.test(id))
+    const updatedExcluded = currentExcluded.filter(id => !admittedIds.includes(id))
+    setProcessing(true)
+    try {
+      const { error } = await supabase.from('exams').update({ excluded_student_ids: updatedExcluded }).eq('id', selectedExam.id)
+      if (error) throw error
+      toast.success(`Admitted ${admittedIds.length} student(s) to CBT hall. Existing attempts remain unaffected!`)
+      setShowAdmitLateModal(false); setSelectedExam(null)
+      await loadExams()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to admit students')
+    } finally { setProcessing(false) }
+  }
+
+  // ── BLOCK / TERMINATE ──────────────────────────────────────────────────
+  const openBlockModal = async (exam: Exam) => {
+    setSelectedExam(exam)
+    setShowBlockModal(true)
+    setLoadingBlockCandidates(true)
+    setBlockSelectedIds(new Set())
+    setBlockSearch('')
+    try {
+      const { data: rawAttempts, error } = await supabase.from('exam_attempts').select('*')
+        .eq('exam_id', exam.id).order('created_at', { ascending: false })
+      if (error) throw error
+
+      const studentIds = Array.from(new Set((rawAttempts || []).map((a: any) => a.student_id).filter((id: any) => UUID_RE.test(String(id)))))
+      let profileMap: Record<string, any> = {}
+      if (studentIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name, class, admission_number').in('id', studentIds)
+        profileMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc }, {})
+      }
+      const enriched = (rawAttempts || []).map((a: any) => ({
+        ...a,
+        profiles: profileMap[a.student_id] || { full_name: 'Unknown Student', class: '' },
+      }))
+      if (!mountedRef.current) return
+      setBlockCandidates(enriched as ExamAttempt[])
+    } catch {
+      toast.error('Failed to load attempts for blocking')
+    } finally {
+      if (mountedRef.current) setLoadingBlockCandidates(false)
+    }
+  }
+
+  const handleConfirmBlock = async () => {
+    if (!selectedExam || blockSelectedIds.size === 0) {
+      toast.error('Select at least one student to block/terminate.'); return
+    }
+    setProcessing(true)
+    try {
+      const ids = Array.from(blockSelectedIds).filter(id => UUID_RE.test(id))
+      const attemptsToTerminate = blockCandidates.filter(a => ids.includes(a.student_id)).map(a => a.id)
+
+      if (attemptsToTerminate.length > 0) {
+        const { error: termErr } = await supabase.from('exam_attempts')
+          .update({ status: 'terminated', submitted_at: new Date().toISOString() })
+          .in('id', attemptsToTerminate)
+        if (termErr) throw termErr
+      }
+
+      const currentExcluded = (selectedExam.excluded_student_ids || []).filter(id => UUID_RE.test(id))
+      const updatedExcluded = Array.from(new Set([...currentExcluded, ...ids]))
+      const { error: examErr } = await supabase.from('exams')
+        .update({ excluded_student_ids: updatedExcluded }).eq('id', selectedExam.id)
+      if (examErr) throw examErr
+
+      toast.success(`Blocked & terminated ${ids.length} student(s). They can no longer continue or re-enter.`)
+      setShowBlockModal(false); setSelectedExam(null)
+      await loadExams()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to block students')
+    } finally { setProcessing(false) }
+  }
+
+  // ── REJECT / RETURN / ARCHIVE / DELETE ─────────────────────────────────
   const handleReject = async () => {
     if (!selectedExam || !rejectionReason.trim()) return
     setProcessing(true)
     try {
       const { error } = await supabase.from('exams').update({
-        status: 'draft', is_published: false, review_notes: rejectionReason,
+        status: 'draft', is_published: false, is_active: false, review_notes: rejectionReason,
       }).eq('id', selectedExam.id)
       if (error) throw error
-      toast.success('Exam sent back for revision')
+      toast.success('Exam sent back to teacher for revision')
       setShowReject(false); setSelectedExam(null); setRejectionReason(''); loadExams()
     } catch (err: any) { toast.error(err.message) }
     finally { setProcessing(false) }
@@ -469,7 +778,7 @@ export default function AdminExamsPage() {
         status: 'draft', is_published: false, is_active: false, review_notes: returnReason || 'Returned for editing',
       }).eq('id', selectedExam.id)
       if (error) throw error
-      toast.success('Exam returned to teacher')
+      toast.success('Exam returned to teacher draft mode')
       setShowReturn(false); setSelectedExam(null); setReturnReason(''); loadExams()
     } catch (err: any) { toast.error(err.message) }
     finally { setProcessing(false) }
@@ -494,34 +803,32 @@ export default function AdminExamsPage() {
     setProcessing(true)
     const examIdToDelete = selectedExam.id
     const examTitle = selectedExam.title
-
     try {
+      // student_answers has no attempt_id — link via (exam_id, student_id).
+      await supabase.from('student_answers').delete().eq('exam_id', examIdToDelete)
       await supabase.from('exam_attempts').delete().eq('exam_id', examIdToDelete)
       await supabase.from('ca_scores').delete().eq('exam_id', examIdToDelete)
 
       const { error } = await supabase.from('exams').delete().eq('id', examIdToDelete)
       if (error) throw error
 
+      if (!mountedRef.current) return
       setExams(prev => prev.filter(e => e.id !== examIdToDelete))
-      toast.success(`"${examTitle}" deleted successfully`)
+      toast.success(`"${examTitle}" deleted permanently`)
       setShowDelete(false); setSelectedExam(null)
       await loadExams()
     } catch (err: any) {
       console.error('Delete Error:', err)
       try {
-        const { error: archiveError } = await supabase.from('exams').update({
+        await supabase.from('exams').update({
           is_archived: true, status: 'archived', is_published: false, is_active: false
         }).eq('id', examIdToDelete)
-        if (archiveError) throw archiveError
-        setExams(prev => prev.map(e => e.id === examIdToDelete ? { ...e, status: 'archived', is_archived: true } : e))
-        toast.success('Exam had linked data. It was archived instead.')
-        setShowDelete(false); setSelectedExam(null)
+        toast.success('Exam had linked references and was safely archived.')
+        setShowDelete(false); setSelectedExam(null); await loadExams()
       } catch (archiveErr: any) {
-        toast.error(archiveErr.message || 'Failed to delete or archive exam')
+        toast.error(archiveErr.message || 'Failed to delete exam')
       }
-    } finally {
-      setProcessing(false)
-    }
+    } finally { setProcessing(false) }
   }
 
   const handleUnarchive = async (exam: Exam) => {
@@ -531,13 +838,13 @@ export default function AdminExamsPage() {
         is_archived: false, is_active: true, is_published: true, status: 'published'
       }).eq('id', exam.id)
       if (error) throw error
-      toast.success('Exam restored')
+      toast.success('Exam restored to published')
       loadExams()
     } catch (err: any) { toast.error(err.message) }
     finally { setProcessing(false) }
   }
 
-  // ── RETRY ─────────────────────────────────────────────────────────────────
+  // ── RETRY ──────────────────────────────────────────────────────────────
   const openRetryDialog = async (exam: Exam) => {
     setSelectedExam(exam)
     setRetryScope('class')
@@ -551,17 +858,12 @@ export default function AdminExamsPage() {
     setLoadingStudents(true)
     try {
       const { data: students, error: studentsError } = await supabase
-        .from('profiles')
-        .select('id, full_name, class, admission_number')
-        .eq('role', 'student')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('class')
-        .order('full_name')
-
+        .from('profiles').select('id, full_name, class, admission_number')
+        .eq('role', 'student').eq('is_active', true).order('class').order('full_name')
       if (studentsError) throw studentsError
 
       const allStu = (students || []) as Student[]
+      if (!mountedRef.current) return
       setAllStudents(allStu)
 
       const grouped: Record<string, Student[]> = {}
@@ -576,88 +878,67 @@ export default function AdminExamsPage() {
       setRetrySelectedClass(grouped[examClass] ? examClass : (Object.keys(grouped)[0] || ''))
       setExpandedRetryClasses(new Set([examClass]))
 
-      const { data: attempts } = await supabase
-        .from('exam_attempts')
-        .select('student_id')
-        .eq('exam_id', exam.id)
+      const { data: attempts } = await supabase.from('exam_attempts').select('student_id').eq('exam_id', exam.id)
       if (attempts) {
         const counts: Record<string, number> = {}
         attempts.forEach((a: any) => { counts[a.student_id] = (counts[a.student_id] || 0) + 1 })
-        setAttemptCounts(counts)
+        if (mountedRef.current) setAttemptCounts(counts)
       }
-    } catch (err: any) {
-      console.error('Retry load error:', err)
-      toast.error('Failed to load students')
+    } catch {
+      toast.error('Failed to load students for retake reset')
+    } finally {
+      if (mountedRef.current) setLoadingStudents(false)
     }
-    finally { setLoadingStudents(false) }
   }
 
   const handleRetry = async () => {
     if (!selectedExam) return
-
-    if (retryScope === 'class' && !retrySelectedClass) {
-      toast.error('Select a class')
-      return
-    }
-    if (retryScope === 'individual' && selectedStudentIds.size === 0) {
-      toast.error('Select at least one student')
-      return
-    }
-
+    if (retryScope === 'class' && !retrySelectedClass) { toast.error('Select a class to reset'); return }
+    if (retryScope === 'individual' && selectedStudentIds.size === 0) { toast.error('Select at least one student'); return }
     setProcessing(true)
-
     try {
       let deletedCount = 0
       let targetLabel = ''
 
-      if (retryScope === 'class') {
-        const classStudentIds = (studentsByClass[retrySelectedClass] || []).map(s => s.id)
-        if (classStudentIds.length === 0) {
-          toast.error(`No students found in ${retrySelectedClass}`)
-          setProcessing(false)
-          return
-        }
-        targetLabel = `${retrySelectedClass} (${classStudentIds.length} students)`
-        const { data: deletedData, error } = await supabase
-          .from('exam_attempts')
-          .delete()
-          .eq('exam_id', selectedExam.id)
-          .in('student_id', classStudentIds)
-          .select('id')
-        if (error) throw error
-        deletedCount = deletedData?.length || 0
-      } else {
-        const ids = Array.from(selectedStudentIds)
-        targetLabel = `${ids.length} selected student(s)`
-        const { data: deletedData, error } = await supabase
-          .from('exam_attempts')
-          .delete()
-          .eq('exam_id', selectedExam.id)
-          .in('student_id', ids)
-          .select('id')
-        if (error) throw error
-        deletedCount = deletedData?.length || 0
+      const classStudentIds = retryScope === 'class'
+        ? (studentsByClass[retrySelectedClass] || []).map(s => s.id)
+        : Array.from(selectedStudentIds)
+
+      if (classStudentIds.length === 0) {
+        toast.error(retryScope === 'class' ? `No students found in ${retrySelectedClass}` : 'No students selected')
+        setProcessing(false); return
       }
 
-      await supabase.from('exams').update({ is_active: true, is_published: true, status: 'published' }).eq('id', selectedExam.id)
+      targetLabel = retryScope === 'class'
+        ? `${retrySelectedClass} (${classStudentIds.length} students)`
+        : `${classStudentIds.length} selected student(s)`
 
-      if (deletedCount === 0) {
-        toast.info(`No active attempts found for ${targetLabel}.`)
-      } else {
-        toast.success(`Cleared ${deletedCount} attempt(s) for ${targetLabel}. Students can retake.`)
-      }
+      // student_answers has no attempt_id — delete by (exam_id, student_id).
+      await supabase.from('student_answers').delete().eq('exam_id', selectedExam.id).in('student_id', classStudentIds)
+
+      const { data: deletedData, error } = await supabase
+        .from('exam_attempts').delete().eq('exam_id', selectedExam.id).in('student_id', classStudentIds).select('id')
+      if (error) throw error
+      deletedCount = deletedData?.length || 0
+
+      // Clear excluded status so retried students can re-enter.
+      const currentExcluded = (selectedExam.excluded_student_ids || []).filter(id => UUID_RE.test(id))
+      const updatedExcluded = currentExcluded.filter(id => !classStudentIds.includes(id))
+      await supabase.from('exams').update({
+        is_active: true, is_published: true, status: 'published', excluded_student_ids: updatedExcluded,
+      }).eq('id', selectedExam.id)
+
+      if (deletedCount === 0) toast.info(`No active attempts found for ${targetLabel}.`)
+      else toast.success(`Cleared ${deletedCount} attempt(s) for ${targetLabel}. Students can retake now.`)
 
       setShowRetry(false); setSelectedExam(null); setSelectedStudentIds(new Set())
       loadExams()
     } catch (err: any) {
-      console.error('Retry Error:', err)
-      toast.error(err.message || 'Failed to reset exam')
-    } finally {
-      setProcessing(false)
-    }
+      toast.error(err.message || 'Failed to reset exam attempts')
+    } finally { setProcessing(false) }
   }
 
-  // ── EXTRA TIME ────────────────────────────────────────────────────────────
+  // ── EXTRA TIME ─────────────────────────────────────────────────────────
   const openExtraTimeDialog = async (exam: Exam) => {
     setSelectedExam(exam)
     setShowExtraTime(true)
@@ -667,105 +948,77 @@ export default function AdminExamsPage() {
     setCustomMinutes('')
     setExtraTimeSearch('')
     try {
-      const { data: rawAttempts, error } = await supabase
-        .from('exam_attempts')
-        .select('*')
-        .eq('exam_id', exam.id)
-        .order('created_at', { ascending: false })
-
+      const { data: rawAttempts, error } = await supabase.from('exam_attempts').select('*')
+        .eq('exam_id', exam.id).order('created_at', { ascending: false })
       if (error) throw error
 
-      const studentIds = Array.from(new Set((rawAttempts || []).map((a: any) => a.student_id)))
+      const studentIds = Array.from(new Set((rawAttempts || []).map((a: any) => a.student_id).filter((id: any) => UUID_RE.test(String(id)))))
       let profileMap: Record<string, any> = {}
       if (studentIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, class, admission_number')
-          .in('id', studentIds)
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name, class, admission_number').in('id', studentIds)
         profileMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc }, {})
       }
-
       const enriched = (rawAttempts || []).map((a: any) => ({
         ...a,
         profiles: profileMap[a.student_id] || { full_name: 'Unknown Student', class: '' },
       }))
+      if (!mountedRef.current) return
       setExtraTimeAttempts(enriched as ExamAttempt[])
-    } catch (err: any) {
-      console.error('Extra time load error:', err)
-      toast.error('Failed to load exam attempts')
+    } catch {
+      toast.error('Failed to load active attempts')
     } finally {
-      setLoadingAttempts(false)
+      if (mountedRef.current) setLoadingAttempts(false)
     }
   }
 
   const handleGrantExtraTime = async () => {
-    if (!selectedAttemptId) {
-      toast.error('Select a student attempt first')
-      return
-    }
-
-    const minutes = customMinutes ? parseInt(customMinutes) : extraMinutes
-    if (!minutes || minutes <= 0 || minutes > 180) {
-      toast.error('Enter valid extra minutes (1–180)')
-      return
-    }
-
+    if (!selectedAttemptId) { toast.error('Select a student attempt first'); return }
+    const minutes = customMinutes ? parseInt(customMinutes, 10) : extraMinutes
+    if (!minutes || minutes <= 0 || minutes > 180) { toast.error('Enter valid extra minutes (1–180)'); return }
     setProcessing(true)
     try {
-      const { data: attempt, error: fetchErr } = await supabase
-        .from('exam_attempts')
-        .select('id, status, is_auto_submitted, extra_time_minutes')
-        .eq('id', selectedAttemptId)
-        .single()
-
+      const { data: attempt, error: fetchErr } = await supabase.from('exam_attempts')
+        .select('id, status, is_auto_submitted, extra_time_minutes, time_remaining_seconds')
+        .eq('id', selectedAttemptId).single()
       if (fetchErr || !attempt) throw new Error('Attempt not found')
 
       const isTerminal = (TERMINAL_ATTEMPT_STATUSES as readonly string[]).includes(String(attempt.status))
       const wasAutoSubmitted = attempt.is_auto_submitted === true
-
       if (isTerminal || wasAutoSubmitted) {
-        const why = isTerminal
-          ? `this attempt is already "${attempt.status}"`
-          : 'this attempt was already auto-submitted'
-        toast.error(
-          `Cannot grant extra time: ${why}. Only in-progress attempts can be extended.`,
-        )
-        setProcessing(false)
-        return
+        toast.error(`Cannot grant extra time: session is already ${attempt.status}. Only live in-progress tests can be extended.`)
+        setProcessing(false); return
       }
 
       const currentExtra = attempt.extra_time_minutes || 0
+      const currentSeconds = attempt.time_remaining_seconds || 0
       const newExtra = currentExtra + minutes
+      const addedSeconds = minutes * 60
 
-      const { error } = await supabase
-        .from('exam_attempts')
-        .update({
-          extra_time_minutes: newExtra,
-          extra_time_updated_at: new Date().toISOString(),
-          status: 'in_progress',
-        })
-        .eq('id', selectedAttemptId)
-
+      const { error } = await supabase.from('exam_attempts').update({
+        extra_time_minutes: newExtra,
+        time_remaining_seconds: currentSeconds + addedSeconds,
+        extra_time_updated_at: new Date().toISOString(),
+        status: 'in_progress',
+      }).eq('id', selectedAttemptId)
       if (error) throw error
 
       const attemptData = extraTimeAttempts.find(a => a.id === selectedAttemptId)
       const studentName = attemptData?.profiles?.full_name || 'Student'
-      toast.success(`Granted ${minutes} extra min to ${studentName}. They can resume immediately.`)
-      setShowExtraTime(false)
-      setSelectedExam(null)
+      toast.success(`Granted +${minutes} extra minutes to ${studentName}! Timer is extended live.`)
+      if (selectedExam) await openExtraTimeDialog(selectedExam)
     } catch (err: any) {
-      console.error('Extra time error:', err)
       toast.error(err.message || 'Failed to grant extra time')
-    } finally {
-      setProcessing(false)
-    }
+    } finally { setProcessing(false) }
   }
 
-  // 🛠️ FILTERING
+  // ── FILTERING ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => exams.filter(exam => {
     const archived = exam.is_archived === true || exam.status === 'archived'
     if (activeTab === 'pending') {
       if (!['pending', 'draft', 'submitted'].includes(exam.status)) return false
+      if (archived) return false
+    } else if (activeTab === 'approved') {
+      if (exam.status !== 'approved') return false
       if (archived) return false
     } else if (activeTab === 'published') {
       if (exam.status !== 'published') return false
@@ -797,8 +1050,20 @@ export default function AdminExamsPage() {
   )
 
   const pendingCount = exams.filter(e => ['pending', 'draft', 'submitted'].includes(e.status) && !e.is_archived).length
+  const approvedCount = exams.filter(e => e.status === 'approved' && !e.is_archived).length
   const publishedCount = exams.filter(e => e.status === 'published' && !e.is_archived && isCurrentTerm(e, currentTermInfo)).length
   const archivedCount = exams.filter(e => e.is_archived === true || e.status === 'archived' || (e.status === 'published' && !isCurrentTerm(e, currentTermInfo))).length
+
+  const filteredAttendanceStudents = useMemo(() => {
+    if (!attendanceSearch) return classStudents
+    const q = attendanceSearch.toLowerCase()
+    return classStudents.filter(s =>
+      s.full_name?.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.class?.toLowerCase().includes(q) ||
+      s.admission_number?.toLowerCase().includes(q)
+    )
+  }, [classStudents, attendanceSearch])
 
   const filteredStudents = useMemo(() => {
     if (!studentSearch) return allStudents
@@ -840,97 +1105,171 @@ export default function AdminExamsPage() {
     )
   }, [extraTimeAttempts, extraTimeSearch])
 
-  const extendableAttempts = useMemo(
-    () => filteredAttempts.filter(isAttemptExtendable),
-    [filteredAttempts],
-  )
-  const nonExtendableAttempts = useMemo(
-    () => filteredAttempts.filter(a => !isAttemptExtendable(a)),
-    [filteredAttempts],
-  )
+  const extendableAttempts = useMemo(() => filteredAttempts.filter(isAttemptExtendable), [filteredAttempts])
+  const nonExtendableAttempts = useMemo(() => filteredAttempts.filter(a => !isAttemptExtendable(a)), [filteredAttempts])
+
+  const filteredBlockCandidates = useMemo(() => {
+    if (!blockSearch) return blockCandidates
+    const q = blockSearch.toLowerCase()
+    return blockCandidates.filter(a =>
+      a.profiles?.full_name?.toLowerCase().includes(q) ||
+      a.profiles?.class?.toLowerCase().includes(q) ||
+      a.status?.toLowerCase().includes(q)
+    )
+  }, [blockCandidates, blockSearch])
 
   const toggleClass = (yr: string) => {
     setExpandedClasses(prev => { const next = new Set(prev); next.has(yr) ? next.delete(yr) : next.add(yr); return next })
   }
+
   const toggleAllClasses = () => {
     const allOpen = groupKeys.every(c => expandedClasses.has(c))
     setExpandedClasses(allOpen ? new Set() : new Set(groupKeys))
   }
+
   const toggleStudent = (id: string) => {
     setSelectedStudentIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
   }
+
   const toggleAllStudents = () => {
     if (selectedStudentIds.size === filteredStudents.length) setSelectedStudentIds(new Set())
     else setSelectedStudentIds(new Set(filteredStudents.map(s => s.id)))
   }
+
   const toggleRetryClass = (cls: string) => {
     setExpandedRetryClasses(prev => { const next = new Set(prev); next.has(cls) ? next.delete(cls) : next.add(cls); return next })
   }
 
-  const clearFilters = () => {
-    setSearchQuery('')
-    setSelectedClass('all')
-    setSelectedDept('all')
+  const toggleBlockStudent = (studentId: string) => {
+    setBlockSelectedIds(prev => { const next = new Set(prev); next.has(studentId) ? next.delete(studentId) : next.add(studentId); return next })
   }
+
+  const clearFilters = () => { setSearchQuery(''); setSelectedClass('all'); setSelectedDept('all') }
   const hasActiveFilters = searchQuery || selectedClass !== 'all' || selectedDept !== 'all'
 
-  // 🛠️ ROW ACTIONS
-  const renderRowActions = (exam: Exam) => (
-    <div className="flex items-center justify-end gap-1">
-      <button
-        onClick={() => { setSelectedExam(exam); loadQs(exam); setShowPreview(true) }}
-        className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
-        title="Preview Exam"
-      >
-        <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-      </button>
+  // ── ROW ACTIONS ────────────────────────────────────────────────────────
+  const renderRowActions = (exam: Exam) => {
+    const excludedCount = (exam.excluded_student_ids || []).filter(id => UUID_RE.test(id)).length
+    return (
+      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+        <button
+          onClick={() => { setSelectedExam(exam); loadQs(exam); setShowPreview(true) }}
+          className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+          title="Preview Exam"
+        >
+          <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+        </button>
 
-      {activeTab === 'pending' && (
-        <>
-          <button onClick={() => { setSelectedExam(exam); setShowApprove(true) }} className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 flex items-center justify-center transition-colors" title="Approve & Publish">
-            <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowReject(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Reject">
-            <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-          </button>
-        </>
-      )}
+        {activeTab === 'pending' && (
+          <>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowApprove(true) }}
+              className="h-8 px-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+              title="Approve Exam"
+            >
+              <CheckCircle className="h-3.5 w-3.5" /> Approve
+            </button>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowReject(true) }}
+              className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors"
+              title="Reject Exam"
+            >
+              <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+            </button>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowDelete(true) }}
+              className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+              title="Delete Exam"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            </button>
+          </>
+        )}
 
-      {activeTab === 'published' && (
-        <>
-          <button onClick={() => openRetryDialog(exam)} className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 flex items-center justify-center transition-colors" title="Allow Retry">
-            <RotateCcw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-          </button>
-          <button onClick={() => openExtraTimeDialog(exam)} className="h-8 w-8 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 flex items-center justify-center transition-colors" title="Grant Extra Time">
-            <Hourglass className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowReturn(true) }} className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 flex items-center justify-center transition-colors" title="Return to Teacher">
-            <Edit3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowArchive(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors" title="Archive">
-            <Archive className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-          </button>
-        </>
-      )}
+        {activeTab === 'approved' && (
+          <>
+            <button
+              onClick={() => openPublishModal(exam)}
+              className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              title="Publish with Hall Attendance Checklist"
+            >
+              <UserCheck className="h-3.5 w-3.5" /> Publish with Attendance
+            </button>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowReturn(true) }}
+              className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 flex items-center justify-center transition-colors"
+              title="Return to Teacher"
+            >
+              <Edit3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            </button>
+          </>
+        )}
 
-      {activeTab === 'archived' && (
-        <>
-          <button onClick={() => handleUnarchive(exam)} disabled={processing} className="h-8 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 transition-colors" title="Restore">
-            <RotateCcw className="h-3 w-3" /> Restore
-          </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-          </button>
-        </>
-      )}
-    </div>
-  )
+        {activeTab === 'published' && (
+          <>
+            {excludedCount > 0 && (
+              <button
+                onClick={() => openAdmitLateModal(exam)}
+                className="h-8 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-xs font-bold flex items-center gap-1 transition-colors"
+                title="Admit arriving students"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                Admit Late ({excludedCount})
+              </button>
+            )}
+            <button
+              onClick={() => openBlockModal(exam)}
+              className="h-8 w-8 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 flex items-center justify-center transition-colors"
+              title="Block / Terminate a student"
+            >
+              <Ban className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+            </button>
+            <button
+              onClick={() => openExtraTimeDialog(exam)}
+              className="h-8 w-8 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 flex items-center justify-center transition-colors"
+              title="Grant Extra Time"
+            >
+              <Hourglass className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+            </button>
+            <button
+              onClick={() => openRetryDialog(exam)}
+              className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 flex items-center justify-center transition-colors"
+              title="Allow Retry"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            </button>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowArchive(true) }}
+              className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+              title="Archive"
+            >
+              <Archive className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
+            </button>
+          </>
+        )}
+
+        {activeTab === 'archived' && (
+          <>
+            <button
+              onClick={() => handleUnarchive(exam)}
+              disabled={processing}
+              className="h-8 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 transition-colors"
+              title="Restore"
+            >
+              <RotateCcw className="h-3 w-3" /> Restore
+            </button>
+            <button
+              onClick={() => { setSelectedExam(exam); setShowDelete(true) }}
+              className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+            </button>
+          </>
+        )}
+      </div>
+    )
+  }
 
   const renderTableHead = () => (
     <TableHeader>
@@ -944,49 +1283,49 @@ export default function AdminExamsPage() {
     </TableHeader>
   )
 
-  const renderExamRow = (exam: Exam) => (
-    <TableRow key={exam.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors border-slate-200 dark:border-slate-800">
-      <TableCell className="py-3">
-        <div>
-          <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{exam.title}</p>
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{exam.subject}</span>
-            <span className="text-slate-300 dark:text-slate-600">·</span>
-            <ClassBadge cls={exam.class} />
-            <DeptPill exam={exam} />
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-            <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-          </div>
+  const renderExamRow = (exam: Exam) => {
+    const excludedCount = (exam.excluded_student_ids || []).filter(id => UUID_RE.test(id)).length
+    return (
+      <TableRow key={exam.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors border-slate-200 dark:border-slate-800">
+        <TableCell className="py-3">
           <div>
-            <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{exam.teacher_name}</p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatDateShort(exam.created_at)}</p>
+            <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{exam.title}</p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{exam.subject}</span>
+              <span className="text-slate-300 dark:text-slate-600">·</span>
+              <ClassBadge cls={exam.class} />
+              <DeptPill exam={exam} />
+              {exam.status === 'published' && excludedCount > 0 && (
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 px-2 py-0.5 rounded-full">
+                  {excludedCount} absent excluded
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      </TableCell>
-      <TableCell className="hidden lg:table-cell">
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-          <span className="flex items-center gap-1" title="Duration">
-            <Timer className="h-3 w-3" /> {exam.duration}m
-          </span>
-          <span className="flex items-center gap-1" title="Questions">
-            <Hash className="h-3 w-3" /> {exam.total_questions}
-          </span>
-          <span className="flex items-center gap-1" title="Total marks">
-            <Target className="h-3 w-3" /> {exam.total_marks}
-          </span>
-        </div>
-      </TableCell>
-      <TableCell>
-        <StatusPill status={exam.is_archived ? 'archived' : exam.status} />
-      </TableCell>
-      <TableCell className="text-right">{renderRowActions(exam)}</TableCell>
-    </TableRow>
-  )
+        </TableCell>
+        <TableCell className="hidden md:table-cell">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{exam.teacher_name}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatDateShort(exam.created_at)}</p>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="hidden lg:table-cell">
+          <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1" title="Duration"><Timer className="h-3 w-3" /> {exam.duration}m</span>
+            <span className="flex items-center gap-1" title="Questions"><Hash className="h-3 w-3" /> {exam.total_questions}</span>
+            <span className="flex items-center gap-1" title="Total marks"><Target className="h-3 w-3" /> {exam.total_marks}</span>
+          </div>
+        </TableCell>
+        <TableCell><StatusPill status={exam.is_archived ? 'archived' : exam.status} /></TableCell>
+        <TableCell className="text-right">{renderRowActions(exam)}</TableCell>
+      </TableRow>
+    )
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
@@ -1000,7 +1339,6 @@ export default function AdminExamsPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-
         {/* HEADER */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 pb-2">
           <div className="flex items-center gap-3">
@@ -1011,7 +1349,7 @@ export default function AdminExamsPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Exam Management</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <Sparkles className="h-3 w-3" />
-                Review, publish, and manage all teacher submissions
+                Approve, publish with attendance, admit late students, and monitor CBT tests
                 {currentTermInfo && (
                   <span className="ml-1 px-2 py-0.5 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 rounded-full text-[10px] font-semibold">
                     {currentTermInfo.term.toUpperCase()} · {currentTermInfo.session_year}
@@ -1044,8 +1382,8 @@ export default function AdminExamsPage() {
           </div>
         </header>
 
-        {/* STATS */}
-        <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        {/* 4 STAGE STATS */}
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <button
             onClick={() => setActiveTab('pending')}
             className={cn(
@@ -1058,14 +1396,32 @@ export default function AdminExamsPage() {
             <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-amber-400 to-orange-400 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending</p>
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending Review</p>
                 <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 dark:text-amber-400" />
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">{pendingCount}</p>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Awaiting approval</p>
             </div>
           </button>
-
+          <button
+            onClick={() => setActiveTab('approved')}
+            className={cn(
+              'relative bg-white dark:bg-slate-900 p-3 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
+              activeTab === 'approved'
+                ? 'ring-2 ring-blue-400 dark:ring-blue-500 border-blue-200 dark:border-blue-500/30 shadow-lg shadow-blue-100 dark:shadow-blue-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-blue-200 dark:hover:border-blue-500/30 hover:shadow-md'
+            )}
+          >
+            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-blue-400 to-indigo-400 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Approved</p>
+                <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 dark:text-blue-400" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 tracking-tight">{approvedCount}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Ready to publish</p>
+            </div>
+          </button>
           <button
             onClick={() => setActiveTab('published')}
             className={cn(
@@ -1078,14 +1434,13 @@ export default function AdminExamsPage() {
             <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-emerald-400 to-green-400 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Published</p>
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Live & Active</p>
                 <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500 dark:text-emerald-400" />
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">{publishedCount}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Live & active</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">CBT ongoing</p>
             </div>
           </button>
-
           <button
             onClick={() => setActiveTab('archived')}
             className={cn(
@@ -1102,7 +1457,7 @@ export default function AdminExamsPage() {
                 <Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500 dark:text-slate-400" />
               </div>
               <p className="text-2xl sm:text-3xl font-bold text-slate-600 dark:text-slate-300 tracking-tight">{archivedCount}</p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Past exams</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Past records</p>
             </div>
           </button>
         </section>
@@ -1124,7 +1479,6 @@ export default function AdminExamsPage() {
                 </button>
               )}
             </div>
-
             <div className="flex items-center gap-2">
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="w-full sm:w-[140px] h-10 text-sm dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-200">
@@ -1135,7 +1489,6 @@ export default function AdminExamsPage() {
                   {CLASS_ORDER.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               <Select value={selectedDept} onValueChange={setSelectedDept}>
                 <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-200">
                   <SelectValue />
@@ -1144,7 +1497,6 @@ export default function AdminExamsPage() {
                   {DEPT_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 text-slate-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
                   <X className="h-3.5 w-3.5 mr-1" /> Clear
@@ -1152,11 +1504,10 @@ export default function AdminExamsPage() {
               )}
             </div>
           </div>
-
           {viewMode === 'grouped' && filtered.length > 0 && (
             <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/60 rounded-b-2xl">
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                <span className="font-semibold text-slate-700 dark:text-slate-200">{filtered.length}</span> exam{filtered.length !== 1 ? 's' : ''} found
+                <span className="font-semibold text-slate-700 dark:text-slate-200">{filtered.length}</span> exam{filtered.length !== 1 ? 's' : ''} in {activeTab}
               </p>
               <button onClick={toggleAllClasses} className="text-[11px] text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-semibold">
                 {groupKeys.every(c => expandedClasses.has(c)) ? 'Collapse All' : 'Expand All'}
@@ -1165,7 +1516,7 @@ export default function AdminExamsPage() {
           )}
         </div>
 
-        {/* LIST / GROUPED VIEW */}
+        {/* LIST / GROUPED CARDS */}
         <section className="space-y-3">
           {filtered.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 py-16 px-6 text-center">
@@ -1174,7 +1525,7 @@ export default function AdminExamsPage() {
               </div>
               <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">No exams found</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                {hasActiveFilters ? 'Try adjusting your filters or search query.' : `No ${activeTab} exams at the moment.`}
+                {hasActiveFilters ? 'Try adjusting your filters or search query.' : `No exams in ${activeTab} stage.`}
               </p>
               {hasActiveFilters && (
                 <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">
@@ -1205,7 +1556,6 @@ export default function AdminExamsPage() {
                     </div>
                     <ChevronDown className={cn('h-4 w-4 text-slate-400 dark:text-slate-500 transition-transform', isOpen && 'rotate-180')} />
                   </button>
-
                   <AnimatePresence initial={false}>
                     {isOpen && (
                       <motion.div
@@ -1218,9 +1568,7 @@ export default function AdminExamsPage() {
                         <div className="overflow-x-auto">
                           <Table>
                             {renderTableHead()}
-                            <TableBody>
-                              {cls.map(exam => renderExamRow(exam))}
-                            </TableBody>
+                            <TableBody>{cls.map(exam => renderExamRow(exam))}</TableBody>
                           </Table>
                         </div>
                       </motion.div>
@@ -1234,21 +1582,16 @@ export default function AdminExamsPage() {
               <div className="overflow-x-auto">
                 <Table>
                   {renderTableHead()}
-                  <TableBody>
-                    {filtered.map(exam => renderExamRow(exam))}
-                  </TableBody>
+                  <TableBody>{filtered.map(exam => renderExamRow(exam))}</TableBody>
                 </Table>
               </div>
             </div>
           )}
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* PREVIEW DIALOG (WITH TABLE & DIAGRAM RENDERING)                     */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* PREVIEW DIALOG */}
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
-            {/* Modal Header */}
             <div className="relative bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-4 sm:px-6 py-5 text-white overflow-hidden flex-shrink-0">
               <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl pointer-events-none" />
               <div className="relative">
@@ -1268,7 +1611,6 @@ export default function AdminExamsPage() {
                     </div>
                   </div>
                 </DialogHeader>
-
                 <div className="flex items-center gap-2 flex-wrap mt-3">
                   <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
                     <BookOpen className="h-3 w-3" /> {selectedExam?.subject}
@@ -1286,7 +1628,6 @@ export default function AdminExamsPage() {
               </div>
             </div>
 
-            {/* Modal Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-4 flex-shrink-0 overflow-x-auto">
               <div className="flex gap-1 min-w-max">
                 <button
@@ -1310,8 +1651,7 @@ export default function AdminExamsPage() {
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     )}
                   >
-                    <Layers className="h-3.5 w-3.5" />
-                    Objective Questions
+                    <Layers className="h-3.5 w-3.5" /> Objective Questions
                     <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{examQs.length}</span>
                   </button>
                 )}
@@ -1325,24 +1665,21 @@ export default function AdminExamsPage() {
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     )}
                   >
-                    <PenTool className="h-3.5 w-3.5" />
-                    Theory Questions
+                    <PenTool className="h-3.5 w-3.5" /> Theory Questions
                     <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{theoryQs.length}</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Modal Content */}
             <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
               {loadingQs ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Loader2 className="h-8 w-8 animate-spin text-violet-500 dark:text-violet-400 mb-3" />
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Loading questions...</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Loading questions & tables...</p>
                 </div>
               ) : (
                 <>
-                  {/* OVERVIEW TAB */}
                   {previewTab === 'info' && selectedExam && (
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
@@ -1363,7 +1700,6 @@ export default function AdminExamsPage() {
                           <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{selectedExam.duration}m</p>
                         </div>
                       </div>
-
                       {selectedExam.instructions && (
                         <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -1375,10 +1711,8 @@ export default function AdminExamsPage() {
                     </div>
                   )}
 
-                  {/* OBJECTIVE TAB */}
                   {previewTab === 'objective' && examQs.length > 0 && (
                     <div className="p-3 sm:p-6 space-y-4">
-                      {/* Question Navigation Bar */}
                       <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
@@ -1386,7 +1720,7 @@ export default function AdminExamsPage() {
                           </span>
                           {(examQs[currentQIdx]?.imageUrl || examQs[currentQIdx]?.image_url) && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 px-2 py-0.5 rounded-full">
-                              <ImageIcon className="h-3 w-3" /> Diagram Attached
+                              <ImageIcon className="h-3 w-3" /> Diagram
                             </span>
                           )}
                         </div>
@@ -1394,161 +1728,418 @@ export default function AdminExamsPage() {
                           <button
                             onClick={() => setCurrentQIdx(i => Math.max(0, i - 1))}
                             disabled={currentQIdx === 0}
-                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setCurrentQIdx(i => Math.min(examQs.length - 1, i + 1))}
                             disabled={currentQIdx === examQs.length - 1}
-                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                           >
                             <ChevronRightIcon className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
-
-                      {/* Question Body */}
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={currentQIdx}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.18 }}
-                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm"
-                        >
-                          <div className="p-4 sm:p-6 space-y-4">
-                            {/* Render Table, Text, Diagram via QuestionContent */}
-                            <QuestionContent
-                              text={examQs[currentQIdx]?.question || 'Question text missing'}
-                              imageUrl={examQs[currentQIdx]?.imageUrl || examQs[currentQIdx]?.image_url}
-                              imageCaption={examQs[currentQIdx]?.imageCaption || examQs[currentQIdx]?.image_caption}
-                            />
-
-                            {/* Options */}
-                            <div className="space-y-2 pt-2">
-                              {(examQs[currentQIdx]?.options || []).map((opt: string, i: number) => {
-                                const letter = String.fromCharCode(65 + i)
-                                const correctAnswer = examQs[currentQIdx]?.correct_answer ?? examQs[currentQIdx]?.answer
-                                const isCorrect = correctAnswer === letter || correctAnswer === opt || correctAnswer === i
-                                return (
-                                  <div
-                                    key={i}
-                                    className={cn(
-                                      'p-3.5 rounded-xl border text-sm flex items-start gap-3 transition-colors',
-                                      isCorrect
-                                        ? 'bg-emerald-50/90 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-100'
-                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                                    )}
-                                  >
-                                    <div className={cn(
-                                      'h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
-                                      isCorrect ? 'bg-emerald-600 text-white dark:bg-emerald-500' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                    )}>
-                                      {letter}
-                                    </div>
-                                    <div className="flex-1 min-w-0 pt-0.5">
-                                      <QuestionContent text={opt} />
-                                    </div>
-                                    {isCorrect && (
-                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full flex-shrink-0">
-                                        <CheckCircle className="h-3.5 w-3.5" /> Correct
-                                      </span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        </motion.div>
-                      </AnimatePresence>
+                      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4 shadow-sm">
+                        <QuestionContent
+                          text={examQs[currentQIdx]?.question || examQs[currentQIdx]?.question_text || 'Question text missing'}
+                          imageUrl={examQs[currentQIdx]?.imageUrl || examQs[currentQIdx]?.image_url}
+                          imageCaption={examQs[currentQIdx]?.imageCaption || examQs[currentQIdx]?.image_caption}
+                        />
+                        <div className="space-y-2 pt-2">
+                          {(examQs[currentQIdx]?.options || []).map((opt: any, i: number) => {
+                            const optText = typeof opt === 'string' ? opt : opt.text || ''
+                            const letter = String.fromCharCode(65 + i)
+                            const correctAnswer = examQs[currentQIdx]?.correct_answer ?? examQs[currentQIdx]?.correct_option
+                            const isCorrect = String(correctAnswer) === letter || String(correctAnswer) === optText || String(correctAnswer) === String(i)
+                            return (
+                              <div
+                                key={i}
+                                className={cn(
+                                  'p-3.5 rounded-xl border text-sm flex items-start gap-3 transition-colors',
+                                  isCorrect
+                                    ? 'bg-emerald-50/90 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-100'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                                )}
+                              >
+                                <div className={cn(
+                                  'h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
+                                  isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                )}>
+                                  {letter}
+                                </div>
+                                <div className="flex-1 min-w-0 pt-0.5">
+                                  <QuestionContent text={optText} />
+                                </div>
+                                {isCorrect && (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                                    <CheckCircle className="h-3.5 w-3.5" /> Correct
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {/* THEORY TAB */}
                   {previewTab === 'theory' && theoryQs.length > 0 && (
                     <div className="p-3 sm:p-6 space-y-4">
-                      {/* Theory Navigation Bar */}
                       <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            Theory Question {currentTheoryIdx + 1} of {theoryQs.length}
-                          </span>
-                          {(theoryQs[currentTheoryIdx]?.image_url || theoryQs[currentTheoryIdx]?.imageUrl) && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-full">
-                              <ImageIcon className="h-3 w-3" /> Diagram Attached
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          Theory Question {currentTheoryIdx + 1} of {theoryQs.length}
+                        </span>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setCurrentTheoryIdx(i => Math.max(0, i - 1))}
                             disabled={currentTheoryIdx === 0}
-                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => setCurrentTheoryIdx(i => Math.min(theoryQs.length - 1, i + 1))}
                             disabled={currentTheoryIdx === theoryQs.length - 1}
-                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                           >
                             <ChevronRightIcon className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
-
-                      {/* Theory Body */}
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={currentTheoryIdx}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.18 }}
-                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-4 sm:p-6 space-y-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <QuestionContent
-                                text={theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
-                                imageUrl={theoryQs[currentTheoryIdx]?.image_url || theoryQs[currentTheoryIdx]?.imageUrl}
-                                imageCaption={theoryQs[currentTheoryIdx]?.image_caption || theoryQs[currentTheoryIdx]?.imageCaption}
-                              />
-                            </div>
-                            {theoryQs[currentTheoryIdx]?.marks > 0 && (
-                              <span className="text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-200 dark:ring-violet-500/30 px-2.5 py-1 rounded-full whitespace-nowrap self-start">
-                                {theoryQs[currentTheoryIdx].marks} Marks
-                              </span>
-                            )}
+                      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <QuestionContent
+                              text={theoryQs[currentTheoryIdx]?.question || theoryQs[currentTheoryIdx]?.question_text || 'Question text missing'}
+                              imageUrl={theoryQs[currentTheoryIdx]?.image_url || theoryQs[currentTheoryIdx]?.imageUrl}
+                              imageCaption={theoryQs[currentTheoryIdx]?.image_caption || theoryQs[currentTheoryIdx]?.imageCaption}
+                            />
                           </div>
-
-                          {/* Recursive Sub-questions */}
-                          {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
-                            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                              <div className="pl-2 sm:pl-3 border-l-2 border-violet-400 dark:border-violet-500/60">
-                                {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
-                              </div>
-                            </div>
+                          {theoryQs[currentTheoryIdx]?.marks > 0 && (
+                            <span className="text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-200 dark:ring-violet-500/30 px-2.5 py-1 rounded-full whitespace-nowrap self-start">
+                              {theoryQs[currentTheoryIdx].marks} Marks
+                            </span>
                           )}
-                        </motion.div>
-                      </AnimatePresence>
+                        </div>
+                        {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
+                          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <div className="pl-2 sm:pl-3 border-l-2 border-violet-400 dark:border-violet-500/60">
+                              {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
               )}
             </div>
 
-            {/* Modal Actions */}
             <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-end gap-2 flex-shrink-0">
-              <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Close</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Close</Button>
               {selectedExam && ['pending', 'draft', 'submitted'].includes(selectedExam.status) && (
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setShowPreview(false); setShowApprove(true) }}>
-                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve & Publish
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setShowPreview(false); setShowApprove(true) }}>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve Exam
+                </Button>
+              )}
+              {selectedExam && selectedExam.status === 'approved' && (
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setShowPreview(false); openPublishModal(selectedExam) }}>
+                  <UserCheck className="h-3.5 w-3.5 mr-1.5" /> Publish with Attendance
                 </Button>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* APPROVE DIALOG */}
+        <Dialog open={showApprove} onOpenChange={setShowApprove}>
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center mb-2">
+                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <DialogTitle className="dark:text-white">Approve Exam</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Mark <strong>{selectedExam?.title}</strong> as approved.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg p-3 text-sm text-blue-800 dark:text-blue-200">
+              <p>Approved exams will move to the <strong>Approved</strong> queue, where you can conduct hall attendance verification before going live.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowApprove(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleApproveOnly} disabled={processing}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Approving...</> : 'Confirm Approval'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* PUBLISH WITH ATTENDANCE MODAL */}
+        <Dialog open={showPublishModal} onOpenChange={setShowPublishModal}>
+          <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col p-0 dark:bg-slate-900 dark:border-slate-800 overflow-hidden">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                    <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base sm:text-lg dark:text-white">
+                      Publish Exam & Hall Attendance
+                    </DialogTitle>
+                    <DialogDescription className="text-xs dark:text-slate-400">
+                      <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.class}</strong> students are listed below.
+                      Everyone is marked <strong className="text-emerald-700 dark:text-emerald-300">present</strong> by default —
+                      uncheck the absent ones and they will be blocked.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+            </div>
+
+            <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <input
+                type="text"
+                placeholder="Filter student list..."
+                value={attendanceSearch}
+                onChange={e => setAttendanceSearch(e.target.value)}
+                className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs w-full sm:w-60"
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-700 dark:text-slate-300 mr-2">
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    {classStudents.filter(s => s.selected).length}
+                  </span>
+                  {' '}Present /{' '}
+                  <span className="text-rose-600 dark:text-rose-400">
+                    {classStudents.filter(s => !s.selected).length}
+                  </span>
+                  {' '}Absent / {classStudents.length} Total
+                </span>
+                <button
+                  onClick={() => { setClassStudents(prev => prev.map(s => ({ ...s, selected: true }))); setAttendanceTouched(true) }}
+                  className="px-2.5 py-1 rounded bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold border border-slate-200 dark:border-slate-600"
+                >
+                  All Present
+                </button>
+                <button
+                  onClick={() => { setClassStudents(prev => prev.map(s => ({ ...s, selected: false }))); setAttendanceTouched(true) }}
+                  className="px-2.5 py-1 rounded bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 font-bold border border-slate-200 dark:border-slate-600"
+                >
+                  All Absent
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5 overflow-y-auto max-h-96 space-y-2 flex-1">
+              {loadingAttendance ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="w-6 h-6 mx-auto animate-spin text-emerald-500 mb-2" />
+                  <p className="text-xs text-slate-500">Loading student attendance list...</p>
+                </div>
+              ) : filteredAttendanceStudents.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-xs">
+                  No students match this filter.
+                </div>
+              ) : (
+                filteredAttendanceStudents.map(student => (
+                  <label
+                    key={student.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border text-xs sm:text-sm cursor-pointer transition ${
+                      student.selected
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/40 text-slate-900 dark:text-white'
+                        : 'bg-rose-50/30 dark:bg-rose-950/20 border-rose-300/40 text-slate-500 dark:text-slate-400 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!student.selected}
+                        onChange={() => {
+                          setAttendanceTouched(true)
+                          setClassStudents(prev => prev.map(s => s.id === student.id ? { ...s, selected: !s.selected } : s))
+                        }}
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <div>
+                        <p className="font-semibold">{student.full_name}</p>
+                        <p className="text-xs text-slate-400">
+                          {student.admission_number ? `${student.admission_number} · ` : ''}
+                          {student.email || student.class}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      student.selected
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                    }`}>
+                      {student.selected ? 'Present' : 'Absent (Blocked)'}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowPublishModal(false)} className="dark:bg-slate-800 dark:border-slate-700">Cancel</Button>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                onClick={handlePublishWithAttendance}
+                disabled={processing || classStudents.length === 0 || classStudents.filter(s => s.selected).length === 0}
+              >
+                {processing ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Publishing...</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-1.5" /> Publish ({classStudents.filter(s => s.selected).length} Present)</>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* ADMIT LATE MODAL */}
+        <Dialog open={showAdmitLateModal} onOpenChange={setShowAdmitLateModal}>
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 dark:bg-slate-900 dark:border-slate-800 overflow-hidden">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                    <UserPlus className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base sm:text-lg dark:text-white">Admit Arriving Students</DialogTitle>
+                    <DialogDescription className="text-xs dark:text-slate-400">
+                      Grant immediate CBT access to late-arrived students without interrupting ongoing sessions.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-2 flex-1 max-h-80">
+              {loadingAbsentStudents ? (
+                <div className="text-center py-6">
+                  <RefreshCw className="w-6 h-6 mx-auto animate-spin text-indigo-500" />
+                </div>
+              ) : absentStudentsList.length === 0 ? (
+                <p className="text-center text-xs text-slate-500 py-6">All students for this exam have already been admitted!</p>
+              ) : (
+                absentStudentsList.map(st => (
+                  <label
+                    key={st.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-xs sm:text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/70"
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!st.selected}
+                        onChange={() => {
+                          setAbsentStudentsList(prev => prev.map(s => s.id === st.id ? { ...s, selected: !s.selected } : s))
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">{st.full_name}</p>
+                        <p className="text-xs text-slate-400">{st.email || st.class}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                      {st.selected ? 'Admit to CBT' : 'Keep Blocked'}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAdmitLateModal(false)} className="dark:bg-slate-800 dark:border-slate-700">Cancel</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold" onClick={handleConfirmAdmitLate} disabled={processing || absentStudentsList.filter(s => s.selected).length === 0}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Admitting...</> : `Admit (${absentStudentsList.filter(s => s.selected).length}) Student(s)`}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* BLOCK / TERMINATE MODAL */}
+        <Dialog open={showBlockModal} onOpenChange={setShowBlockModal}>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-xl bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center mb-2">
+                <Ban className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <DialogTitle className="dark:text-white">Block / Terminate Student(s)</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Instantly block a student's attempt and prevent re-entry into <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.title}</strong>. Use for cheating or unauthorized remote access.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+              <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+              <input
+                value={blockSearch}
+                onChange={e => setBlockSearch(e.target.value)}
+                placeholder="Search by student, class, or status..."
+                className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              />
+            </div>
+
+            <div className="flex-1 overflow-y-auto max-h-[380px] space-y-1.5">
+              {loadingBlockCandidates ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-rose-500 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading attempts...</p>
+                </div>
+              ) : filteredBlockCandidates.length === 0 ? (
+                <div className="text-center py-10 text-xs text-slate-500 dark:text-slate-400">
+                  No attempts found for this exam.
+                </div>
+              ) : (
+                filteredBlockCandidates.map(a => {
+                  const isSelected = blockSelectedIds.has(a.student_id)
+                  const alreadyTerminated = a.status === 'terminated'
+                  return (
+                    <label
+                      key={a.id}
+                      className={cn(
+                        'flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition',
+                        alreadyTerminated
+                          ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'
+                          : isSelected
+                            ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/40'
+                            : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={alreadyTerminated}
+                          onChange={() => toggleBlockStudent(a.student_id)}
+                          className="w-3.5 h-3.5 rounded text-rose-600 focus:ring-rose-500"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{a.profiles?.full_name || 'Unknown'}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <AttemptStatusPill status={a.status} />
+                            {alreadyTerminated && <span className="text-[9px] font-bold text-slate-500">already blocked</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                  )
+                })
+              )}
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button variant="outline" onClick={() => setShowBlockModal(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-rose-600 hover:bg-rose-700 text-white" onClick={handleConfirmBlock} disabled={processing || blockSelectedIds.size === 0}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Blocking...</> : <><Ban className="h-3.5 w-3.5 mr-1.5" /> Block {blockSelectedIds.size} Student(s)</>}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1563,10 +2154,10 @@ export default function AdminExamsPage() {
               <DialogDescription className="dark:text-slate-400">This action cannot be undone.</DialogDescription>
             </DialogHeader>
             <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg p-3 text-sm text-red-800 dark:text-red-200">
-              <p>You are about to delete <strong>{selectedExam?.title}</strong>. All associated student attempts and CA scores will be permanently removed.</p>
+              <p>You are about to delete <strong>{selectedExam?.title}</strong>. All associated student attempts, answers and CA scores will be removed.</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
+              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDelete} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Deleting...</> : 'Delete Permanently'}
               </Button>
@@ -1574,29 +2165,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* APPROVE / PUBLISH MODAL */}
-        <Dialog open={showApprove} onOpenChange={setShowApprove}>
-          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
-            <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-2">
-                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <DialogTitle className="dark:text-white">Publish Exam</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">Make this exam available to students immediately.</DialogDescription>
-            </DialogHeader>
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-lg p-3 text-sm text-emerald-800 dark:text-emerald-200">
-              <p>Publishing <strong>{selectedExam?.title}</strong> will make it live for all eligible students in <strong>{selectedExam?.class}</strong>.</p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowApprove(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove} disabled={processing}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Publishing...</> : <><Send className="h-4 w-4 mr-1.5" /> Publish Now</>}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* RETRY / RETAKE MODAL */}
+        {/* RETRY MODAL */}
         <Dialog open={showRetry} onOpenChange={setShowRetry}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1605,7 +2174,7 @@ export default function AdminExamsPage() {
               </div>
               <DialogTitle className="dark:text-white">Allow Retake</DialogTitle>
               <DialogDescription className="dark:text-slate-400">
-                Reset attempts for <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.title}</strong>. Only active students are shown.
+                Reset attempts for <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.title}</strong>.
               </DialogDescription>
             </DialogHeader>
 
@@ -1703,7 +2272,6 @@ export default function AdminExamsPage() {
                           className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         />
                       </div>
-
                       <div className="flex items-center justify-between px-1">
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           <span className="font-bold text-slate-700 dark:text-slate-200">{selectedStudentIds.size}</span> selected
@@ -1712,7 +2280,6 @@ export default function AdminExamsPage() {
                           {selectedStudentIds.size === filteredStudents.length ? 'Deselect All' : 'Select All Visible'}
                         </button>
                       </div>
-
                       <div className="max-h-[380px] overflow-y-auto space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50/50 dark:bg-slate-950/50">
                         {filteredRetryClassKeys.map(cls => {
                           const students = filteredStudentsByClass[cls] || []
@@ -1733,36 +2300,40 @@ export default function AdminExamsPage() {
                                   <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{cls}</p>
                                   <span className="text-[10px] text-slate-500 dark:text-slate-400">({students.length})</span>
                                   {selectedInClass > 0 && (
-                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
+                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded-full">
                                       {selectedInClass} selected
                                     </span>
                                   )}
                                 </div>
                                 <ChevronDown className={cn('h-3.5 w-3.5 text-slate-400 transition-transform', isOpen && 'rotate-180')} />
                               </button>
-
                               {isOpen && (
                                 <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
-                                  {students.map(s => {
-                                    const attempts = attemptCounts[s.id] || 0
+                                  {students.map(st => {
+                                    const isChecked = selectedStudentIds.has(st.id)
+                                    const attempted = (attemptCounts[st.id] || 0) > 0
                                     return (
-                                      <label key={s.id} className="flex items-center gap-2.5 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedStudentIds.has(s.id)}
-                                          onChange={() => toggleStudent(s.id)}
-                                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 dark:bg-slate-800"
-                                        />
-                                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                          <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                                      <label
+                                        key={st.id}
+                                        className="flex items-center justify-between px-3 py-2 text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => toggleStudent(st.id)}
+                                            className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                                          />
+                                          <div className="min-w-0">
+                                            <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{st.full_name}</p>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                                              {st.admission_number ? `${st.admission_number} · ` : ''}{st.class}
+                                            </p>
+                                          </div>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{s.full_name}</p>
-                                          <p className="text-[10px] text-slate-500 dark:text-slate-400">{s.admission_number || s.class}</p>
-                                        </div>
-                                        {attempts > 0 && (
-                                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
-                                            {attempts} attempt{attempts !== 1 ? 's' : ''}
+                                        {attempted && (
+                                          <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                            Attempted
                                           </span>
                                         )}
                                       </label>
@@ -1773,9 +2344,6 @@ export default function AdminExamsPage() {
                             </div>
                           )
                         })}
-                        {filteredRetryClassKeys.length === 0 && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">No active students found</p>
-                        )}
                       </div>
                     </>
                   )}
@@ -1783,10 +2351,10 @@ export default function AdminExamsPage() {
               )}
             </div>
 
-            <DialogFooter className="pt-3 border-t border-slate-200 dark:border-slate-800">
-              <Button variant="outline" onClick={() => setShowRetry(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleRetry} disabled={processing}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Clearing...</> : <><RotateCcw className="h-4 w-4 mr-1.5" /> Clear Attempts</>}
+            <DialogFooter className="pt-2">
+              <Button variant="outline" onClick={() => setShowRetry(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleRetry} disabled={processing || loadingStudents}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Resetting...</> : <><RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset Attempts</>}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1801,7 +2369,7 @@ export default function AdminExamsPage() {
               </div>
               <DialogTitle className="dark:text-white">Grant Extra Time</DialogTitle>
               <DialogDescription className="dark:text-slate-400">
-                Extend the exam timer for a student. Updates are sent live and their timer extends instantly. Only in-progress attempts can be extended.
+                Extend live in-progress attempts for <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.title}</strong>. Completed or graded attempts are protected.
               </DialogDescription>
             </DialogHeader>
 
@@ -1811,233 +2379,122 @@ export default function AdminExamsPage() {
                 <input
                   value={extraTimeSearch}
                   onChange={e => setExtraTimeSearch(e.target.value)}
-                  placeholder="Search by student name or class..."
+                  placeholder="Search by student, class, or status..."
                   className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
               </div>
 
               {loadingAttempts ? (
                 <div className="py-10 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-orange-500 dark:text-orange-400 mx-auto mb-2" />
+                  <Loader2 className="h-6 w-6 animate-spin text-orange-500 mx-auto mb-2" />
                   <p className="text-xs text-slate-500 dark:text-slate-400">Loading attempts...</p>
                 </div>
               ) : filteredAttempts.length === 0 ? (
-                <div className="py-10 text-center">
-                  <Hourglass className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No attempts yet</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">No students have started this exam.</p>
-                </div>
-              ) : extendableAttempts.length === 0 ? (
-                <div className="py-10 text-center">
-                  <Hourglass className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No extendable attempts</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                    All attempts for this exam are already submitted, graded, or terminated. Only in-progress attempts can be extended.
-                  </p>
+                <div className="text-center py-10 text-xs text-slate-500 dark:text-slate-400">
+                  No attempts found for this exam.
                 </div>
               ) : (
-                <div className="max-h-[320px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
-                  {extendableAttempts.map(a => {
-                    const isSelected = selectedAttemptId === a.id
-                    const nowMs = Date.now()
-                    const effectiveEndMs = computeEffectiveEndMs(
-                      a.started_at,
-                      selectedExam?.duration ?? 0,
-                      a.extra_time_minutes ?? 0,
-                    )
-                    const isExpired = effectiveEndMs !== null && effectiveEndMs < nowMs
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={() => setSelectedAttemptId(a.id)}
-                        className={cn(
-                          'w-full flex items-center gap-2.5 p-3 text-left transition-colors',
-                          isSelected
-                            ? 'bg-orange-50 dark:bg-orange-500/10'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          checked={isSelected}
-                          onChange={() => setSelectedAttemptId(a.id)}
-                          className="h-4 w-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
-                          <User className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-                              {a.profiles?.full_name || 'Unknown'}
-                            </p>
-                            <AttemptStatusPill status={a.status} />
-                            {isExpired && (
-                              <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/20 px-1.5 py-0.5 rounded-full">
-                                TIMER EXPIRED
-                              </span>
+                <div className="space-y-2">
+                  {extendableAttempts.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Live Attempts ({extendableAttempts.length})
+                      </p>
+                      <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+                        {extendableAttempts.map(a => (
+                          <button
+                            key={a.id}
+                            onClick={() => setSelectedAttemptId(a.id)}
+                            className={cn(
+                              'w-full p-2.5 rounded-lg border-2 text-left transition-all flex items-center justify-between gap-2',
+                              selectedAttemptId === a.id
+                                ? 'border-orange-500 dark:border-orange-400 bg-orange-50 dark:bg-orange-500/10 ring-2 ring-orange-100 dark:ring-orange-500/30'
+                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
                             )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 dark:text-slate-400 flex-wrap">
-                            {a.profiles?.class && <span>{a.profiles.class}</span>}
-                            {effectiveEndMs !== null && (
-                              <span>Ends: {formatDateTime(new Date(effectiveEndMs).toISOString())}</span>
-                            )}
-                            {(a.extra_time_minutes ?? 0) > 0 && (
-                              <span className="text-orange-600 dark:text-orange-400 font-bold">
-                                +{a.extra_time_minutes}m granted
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{a.profiles?.full_name || 'Unknown'}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <AttemptStatusPill status={a.status} />
+                                {(a.extra_time_minutes || 0) > 0 && (
+                                  <span className="text-[9px] font-bold text-orange-700 dark:text-orange-300">
+                                    +{a.extra_time_minutes}m granted
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {selectedAttemptId === a.id && <CheckCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {nonExtendableAttempts.length > 0 && (
-                    <>
-                      <div className="px-3 py-2 bg-slate-50/70 dark:bg-slate-800/40">
-                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                          Submitted / Locked — cannot extend
-                        </p>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Protected / Concluded ({nonExtendableAttempts.length})
+                      </p>
+                      <div className="space-y-1.5 max-h-[160px] overflow-y-auto opacity-70">
+                        {nonExtendableAttempts.map(a => (
+                          <div
+                            key={a.id}
+                            className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{a.profiles?.full_name || 'Unknown'}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <AttemptStatusPill status={a.status} />
+                                {a.is_auto_submitted && (
+                                  <span className="text-[9px] font-bold text-red-700 dark:text-red-300">auto-submitted</span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">Protected</span>
+                          </div>
+                        ))}
                       </div>
-                      {nonExtendableAttempts.map(a => (
-                        <div
-                          key={a.id}
-                          className="w-full flex items-center gap-2.5 p-3 opacity-60 cursor-not-allowed"
-                          title="This attempt is already submitted and cannot be extended."
-                        >
-                          <div className="h-4 w-4 rounded-full border-2 border-slate-300 dark:border-slate-600 flex-shrink-0" />
-                          <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
-                            <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
-                                {a.profiles?.full_name || 'Unknown'}
-                              </p>
-                              <AttemptStatusPill status={a.status} />
-                              {a.is_auto_submitted === true && (
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                                  AUTO-SUBMITTED
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400 dark:text-slate-500 flex-wrap">
-                              {a.profiles?.class && <span>{a.profiles.class}</span>}
-                              <span className="italic">Already submitted — cannot be extended</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </>
+                    </div>
                   )}
                 </div>
               )}
 
               {selectedAttemptId && (
-                <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-xl p-3 space-y-3">
-                  <p className="text-xs font-bold text-orange-800 dark:text-orange-300 uppercase tracking-wider">
-                    Extra time to grant
-                  </p>
-                  <div className="grid grid-cols-5 gap-1.5">
+                <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-lg p-3 space-y-2">
+                  <p className="text-[11px] font-bold text-orange-800 dark:text-orange-200 uppercase tracking-wider">Grant Minutes</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {[5, 10, 15, 20, 30].map(m => (
                       <button
                         key={m}
                         onClick={() => { setExtraMinutes(m); setCustomMinutes('') }}
                         className={cn(
-                          'py-2 rounded-lg text-xs font-bold border-2 transition-all',
-                          !customMinutes && extraMinutes === m
-                            ? 'bg-orange-600 border-orange-600 text-white shadow-sm'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-orange-300 dark:hover:border-orange-500/40'
+                          'px-3 py-1 rounded-lg text-xs font-bold transition-colors',
+                          extraMinutes === m && !customMinutes
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-white dark:bg-slate-800 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-500/30'
                         )}
                       >
                         +{m}m
                       </button>
                     ))}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-                      <Plus className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="number"
-                        value={customMinutes}
-                        onChange={e => setCustomMinutes(e.target.value)}
-                        placeholder="Custom minutes (1-180)"
-                        min={1}
-                        max={180}
-                        className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                      />
-                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">min</span>
-                    </div>
-                  </div>
-                  <div className="bg-white dark:bg-slate-900 rounded-lg p-2.5 border border-orange-200 dark:border-orange-500/30">
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                      Granting <strong className="text-orange-600 dark:text-orange-400">
-                        +{customMinutes ? parseInt(customMinutes) || 0 : extraMinutes} minutes
-                      </strong> — the student's timer will extend immediately without resetting their exam state.
-                    </p>
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={customMinutes}
+                      onChange={e => setCustomMinutes(e.target.value)}
+                      placeholder="Custom"
+                      className="w-20 px-2 py-1 rounded-lg text-xs border border-orange-200 dark:border-orange-500/30 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                    />
                   </div>
                 </div>
               )}
             </div>
 
-            <DialogFooter className="pt-3 border-t border-slate-200 dark:border-slate-800">
-              <Button variant="outline" onClick={() => setShowExtraTime(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
+            <DialogFooter className="pt-2">
+              <Button variant="outline" onClick={() => setShowExtraTime(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
               <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleGrantExtraTime} disabled={processing || !selectedAttemptId}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Granting...</> : <><Hourglass className="h-4 w-4 mr-1.5" /> Grant Extra Time</>}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* REJECT MODAL */}
-        <Dialog open={showReject} onOpenChange={setShowReject}>
-          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
-            <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center mb-2">
-                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              </div>
-              <DialogTitle className="dark:text-white">Reject Exam</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">Send this exam back to the teacher with feedback.</DialogDescription>
-            </DialogHeader>
-            <Textarea
-              value={rejectionReason}
-              onChange={e => setRejectionReason(e.target.value)}
-              placeholder="Explain what needs to be revised..."
-              rows={4}
-              className="text-sm resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReject(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
-              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleReject} disabled={processing || !rejectionReason.trim()}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Sending...</> : 'Send Back'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* RETURN MODAL */}
-        <Dialog open={showReturn} onOpenChange={setShowReturn}>
-          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
-            <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center mb-2">
-                <Edit3 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <DialogTitle className="dark:text-white">Return for Editing</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">Unpublish and return <strong>{selectedExam?.title}</strong> to the teacher.</DialogDescription>
-            </DialogHeader>
-            <Textarea
-              value={returnReason}
-              onChange={e => setReturnReason(e.target.value)}
-              placeholder="Reason for return (optional)..."
-              rows={3}
-              className="text-sm resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReturn(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
-              <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleReturn} disabled={processing}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Returning...</> : 'Return to Teacher'}
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Granting...</> : <><Hourglass className="h-3.5 w-3.5 mr-1.5" /> Grant Extra Time</>}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2051,20 +2508,81 @@ export default function AdminExamsPage() {
                 <Archive className="h-5 w-5 text-slate-600 dark:text-slate-300" />
               </div>
               <DialogTitle className="dark:text-white">Archive Exam</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">Move this exam out of active circulation.</DialogDescription>
+              <DialogDescription className="dark:text-slate-400">This will move the exam to archived status.</DialogDescription>
             </DialogHeader>
             <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300">
-              <p>Archive <strong>{selectedExam?.title}</strong>? Students will lose access, but all scores and data will be preserved for records.</p>
+              <p><strong>{selectedExam?.title}</strong> will be hidden from the live view but preserved for records. You can restore it later from the Archived tab.</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowArchive(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
-              <Button className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white" onClick={handleArchive} disabled={processing}>
-                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Archiving...</> : <><Archive className="h-4 w-4 mr-1.5" /> Archive</>}
+              <Button variant="outline" onClick={() => setShowArchive(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-slate-600 hover:bg-slate-700 text-white" onClick={handleArchive} disabled={processing}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Archiving...</> : 'Archive Exam'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
+        {/* REJECT MODAL */}
+        <Dialog open={showReject} onOpenChange={setShowReject}>
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center mb-2">
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <DialogTitle className="dark:text-white">Reject Exam</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Send <strong>{selectedExam?.title}</strong> back to the teacher for revision.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Rejection Reason</label>
+              <Textarea
+                value={rejectionReason}
+                onChange={e => setRejectionReason(e.target.value)}
+                placeholder="Explain what needs to be fixed..."
+                rows={4}
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowReject(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleReject} disabled={processing || !rejectionReason.trim()}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Rejecting...</> : 'Reject & Return'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* RETURN MODAL */}
+        <Dialog open={showReturn} onOpenChange={setShowReturn}>
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center mb-2">
+                <Edit3 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <DialogTitle className="dark:text-white">Return to Teacher</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Return <strong>{selectedExam?.title}</strong> to teacher draft mode for editing.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Note to Teacher (optional)</label>
+              <Textarea
+                value={returnReason}
+                onChange={e => setReturnReason(e.target.value)}
+                placeholder="Add a note about what needs editing..."
+                rows={3}
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowReturn(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200">Cancel</Button>
+              <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleReturn} disabled={processing}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Returning...</> : 'Return to Teacher'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

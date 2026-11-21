@@ -4,7 +4,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, XCircle } from "lucide-react"
+import { Loader2, XCircle, UserX, AlertTriangle, RefreshCw } from "lucide-react"
+
+import { createClient } from "@/lib/supabase/client"
 
 import { useExamLoader } from "./hooks/useExamLoader"
 import { useExamSecurity } from "./hooks/useExamSecurity"
@@ -21,7 +23,6 @@ import {
   EXAM_CONFIG,
   DEFAULT_PASSING_PERCENTAGE,
   DEFAULT_MAX_ATTEMPTS,
-  DEFAULT_EXAM_DURATION,
 } from "./constants"
 
 import type { ExamResult } from "./types"
@@ -40,10 +41,24 @@ import { Button } from "@/components/ui/button"
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function parseStartMs(raw: string | undefined | null): number | null {
   if (!raw) return null
   const ms = new Date(raw).getTime()
   return Number.isFinite(ms) ? ms : null
+}
+
+function resolveExamDuration(exam: any): number {
+  if (!exam) return 60
+  const candidate =
+    exam.duration_minutes ??
+    exam.duration ??
+    exam.time_limit_minutes ??
+    exam.duration_mins ??
+    exam.time_limit
+  const parsed = Number(candidate)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60
 }
 
 async function requestFullscreen(): Promise<void> {
@@ -67,8 +82,9 @@ export default function TakeExamPage() {
   const examEndedRef = useRef(false)
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ✅ Keeps LoadingView mounted for the calming period
   const [calmingDone, setCalmingDone] = useState(false)
+  const [isCheckingAdmission, setIsCheckingAdmission] = useState(false)
+  const [locallyAdmitted, setLocallyAdmitted] = useState(false)
 
   const {
     state,
@@ -105,7 +121,62 @@ export default function TakeExamPage() {
   const [dbExtraMinutes, setDbExtraMinutes] = useState<number>(0)
   const [extraTimeBanner, setExtraTimeBanner] = useState<{ delta: number; ts: number } | null>(null)
 
-  // ✅ Realtime + polling sync for extra time grants
+  const dynamicBaseDuration = useMemo(() => resolveExamDuration(exam), [exam])
+  const totalDurationMinutes = dynamicBaseDuration + dbExtraMinutes
+
+  // FIX: only UUID-shaped identifiers can match excluded_student_ids (uuid[]).
+  // Admission numbers are text and would never match a uuid[] element.
+  const studentCandidateIds = useMemo<string[]>(() => {
+    if (!profile) return []
+    const p = profile as Record<string, any>
+    const ids = [p.id, p.user_id, p.userId, p.student_id, p.studentId]
+      .filter(Boolean)
+      .map(String)
+      .filter(id => UUID_RE.test(id))
+    return Array.from(new Set(ids))
+  }, [profile])
+
+  // ── Realtime Attendance & Block Listener ───────────────────────────────
+  useEffect(() => {
+    if (!examId || studentCandidateIds.length === 0) return
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`exam-admission-${examId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'exams',
+          filter: `id=eq.${examId}`,
+        },
+        (payload: any) => {
+          const excludedList: string[] = (payload.new?.excluded_student_ids || [])
+            .map(String)
+            .map((s: string) => s.toLowerCase())
+
+          const stillExcluded = studentCandidateIds.some(id =>
+            excludedList.includes(id.toLowerCase())
+          )
+
+          if (!stillExcluded) {
+            toast.success("You have been admitted to the exam hall! Unlocking session...")
+            setLocallyAdmitted(true)
+          } else if (state.examStarted) {
+            toast.error("You have been blocked by the exam officer. Submitting...")
+            void handleSubmitRef.current(true, "Blocked by exam officer")
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, studentCandidateIds])
+
   const { extraMinutes: liveExtraMinutes } = useExtraTimeSync({
     attemptId: attemptId ?? undefined,
     enabled: state.examStarted && state.isFullyRestored,
@@ -122,10 +193,8 @@ export default function TakeExamPage() {
     if (liveExtraMinutes !== dbExtraMinutes) {
       setDbExtraMinutes(liveExtraMinutes)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveExtraMinutes])
+  }, [liveExtraMinutes, dbExtraMinutes])
 
-  // Derived counts (memoized)
   const derived = useMemo(() => {
     const theoryQuestions = allQuestions.filter((q) => q.type === "theory")
     const objectiveQuestions = allQuestions.filter((q) => q.type !== "theory")
@@ -168,7 +237,7 @@ export default function TakeExamPage() {
     studentId: profile?.id,
     allQuestions,
     answers: state.answers,
-    examDuration: Number(exam?.duration) || DEFAULT_EXAM_DURATION,
+    examDuration: dynamicBaseDuration,
     passingPercentage: exam?.passing_percentage ?? DEFAULT_PASSING_PERCENTAGE,
     maxAttempts: exam?.max_attempts ?? DEFAULT_MAX_ATTEMPTS,
     tabSwitches: 0,
@@ -182,12 +251,9 @@ export default function TakeExamPage() {
 
   handleSubmitRef.current = handleSubmit
 
-  const baseDurationMinutes = Number(exam?.duration) || DEFAULT_EXAM_DURATION
-  const durationMinutes = baseDurationMinutes + dbExtraMinutes
-
   const { timeLeft, cleanup } = useExamTimer({
     examStarted: state.examStarted,
-    durationMinutes,
+    durationMinutes: totalDurationMinutes,
     examEndedRef,
     startTime: dbStartTime ?? undefined,
     attemptId: attemptId ?? undefined,
@@ -233,8 +299,6 @@ export default function TakeExamPage() {
     }
   }, [])
 
-  // ── Enter Exam ─────────────────────────────────────────────────────────
-
   const enterExam = useCallback(
     async (
       existingAttemptId: string,
@@ -245,18 +309,10 @@ export default function TakeExamPage() {
       let startMs = knownStartMs ?? null
       let extraMin = _knownExtraMinutes ?? 0
 
-      if (
-        startMs == null ||
-        !Number.isFinite(startMs) ||
-        _knownExtraMinutes == null
-      ) {
+      if (startMs == null || !Number.isFinite(startMs) || _knownExtraMinutes == null) {
         const info = await fetchCanonicalStartInfo(existingAttemptId)
-        if (startMs == null || !Number.isFinite(startMs)) {
-          startMs = info.startedAtMs
-        }
-        if (_knownExtraMinutes == null) {
-          extraMin = info.extraTimeMinutes
-        }
+        if (startMs == null || !Number.isFinite(startMs)) startMs = info.startedAtMs
+        if (_knownExtraMinutes == null) extraMin = info.extraTimeMinutes
       }
 
       if (startMs == null || !Number.isFinite(startMs)) {
@@ -264,10 +320,7 @@ export default function TakeExamPage() {
         return false
       }
 
-      const durationMin = Math.max(
-        1,
-        Number(exam?.duration) || DEFAULT_EXAM_DURATION,
-      )
+      const durationMin = dynamicBaseDuration
       const totalSec = (durationMin + extraMin) * 60
       const elapsed = Math.floor((Date.now() - startMs) / 1000)
       const remaining = Math.max(0, totalSec - elapsed)
@@ -296,42 +349,25 @@ export default function TakeExamPage() {
 
       return true
     },
-    [exam?.duration, setAttemptId, dispatch, setShowResumeDialog],
+    [dynamicBaseDuration, setAttemptId, dispatch, setShowResumeDialog],
   )
-
-  // ── Resume ─────────────────────────────────────────────────────────────
 
   const onResumeExam = useCallback(async () => {
     const data = await handleResumeExam()
     if (!data?.attemptId) return
-
     const knownStartMs = parseStartMs(data.started_at)
     if (knownStartMs == null) {
       toast.error("Cannot resume — corrupted start time.")
       return
     }
-
     await enterExam(data.attemptId, data.answers ?? {}, knownStartMs, undefined)
   }, [handleResumeExam, enterExam])
 
   useEffect(() => {
-    if (
-      isResumeQuery &&
-      resumeData &&
-      !state.examStarted &&
-      !showResumeDialog
-    ) {
+    if (isResumeQuery && resumeData && !state.examStarted && !showResumeDialog) {
       onResumeExam()
     }
-  }, [
-    isResumeQuery,
-    resumeData,
-    state.examStarted,
-    showResumeDialog,
-    onResumeExam,
-  ])
-
-  // ── Start ──────────────────────────────────────────────────────────────
+  }, [isResumeQuery, resumeData, state.examStarted, showResumeDialog, onResumeExam])
 
   const startExam = useCallback(async () => {
     dispatch({ type: "START_EXAM_BEGIN" })
@@ -345,56 +381,97 @@ export default function TakeExamPage() {
         return
       }
 
-      const ok = await enterExam(
-        result.attemptId,
-        {},
-        parseStartMs(result.started_at),
-        undefined,
-      )
-
+      const ok = await enterExam(result.attemptId, {}, parseStartMs(result.started_at), undefined)
       if (!ok) {
         dispatch({ type: "START_EXAM_FAIL" })
         return
       }
 
-      toast.success(
-        result.isResuming ? "Exam resumed!" : "Exam started! Good luck!",
-      )
+      toast.success(result.isResuming ? "Exam resumed!" : "Exam started! Good luck!")
     } catch {
       toast.error("Failed to start exam")
       dispatch({ type: "START_EXAM_FAIL" })
     }
   }, [dispatch, setFullscreen, startNewAttempt, enterExam])
 
-  // ── Fullscreen return ──────────────────────────────────────────────────
-
   const handleReturnToFullscreen = useCallback(async () => {
     try {
       await requestFullscreen()
       setFullscreen(true)
-      setTimeout(
-        () => setShowFullscreenPrompt(false),
-        EXAM_CONFIG.FULLSCREEN_PROMPT_DISMISS_MS,
-      )
+      setTimeout(() => setShowFullscreenPrompt(false), EXAM_CONFIG.FULLSCREEN_PROMPT_DISMISS_MS)
     } catch {
       toast.error("Please press F11 to enter fullscreen.")
     }
   }, [setFullscreen, setShowFullscreenPrompt])
 
+  // ── Attendance Exclusion Gate ──────────────────────────────────────────
+  const isExcludedFromAttendance = useMemo(() => {
+    if (locallyAdmitted) return false
+    if (!exam || studentCandidateIds.length === 0) return false
+
+    const excludedList: string[] = ((exam as any).excluded_student_ids || [])
+      .map(String)
+      .map((s: string) => s.toLowerCase())
+
+    if (excludedList.length === 0) return false
+
+    return studentCandidateIds.some(id => excludedList.includes(id.toLowerCase()))
+  }, [exam, studentCandidateIds, locallyAdmitted])
+
+  const handleCheckAdmissionStatus = async () => {
+    setIsCheckingAdmission(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('exams')
+        .select('excluded_student_ids, is_published, is_active, is_archived, status')
+        .eq('id', examId)
+        .single()
+
+      if (error) throw error
+
+      const stillLive =
+        data?.is_published === true &&
+        data?.is_active === true &&
+        data?.is_archived !== true &&
+        data?.status === 'published'
+
+      if (!stillLive) {
+        toast.error("This exam is no longer available.")
+        router.push("/student/exams")
+        return
+      }
+
+      const excludedList: string[] = (data?.excluded_student_ids || [])
+        .map(String)
+        .map((s: string) => s.toLowerCase())
+
+      const stillExcluded = studentCandidateIds.some(id =>
+        excludedList.includes(id.toLowerCase())
+      )
+
+      if (!stillExcluded) {
+        toast.success("You have been admitted by the invigilator! Unlocking exam...")
+        setLocallyAdmitted(true)
+      } else {
+        toast.error("You are still marked absent. Please notify the invigilator in the hall.")
+      }
+    } catch (err: any) {
+      toast.error("Could not verify status: " + (err.message || "Network issue"))
+    } finally {
+      setIsCheckingAdmission(false)
+    }
+  }
+
   const isTerminated = examTerminated || securityViolated
 
-  // ✅ Extract explicitly First Name first (ensuring we avoid surname)
   const studentDisplayName = useMemo<string | undefined>(() => {
     if (!profile) return undefined
     const p = profile as Record<string, unknown>
-    
-    // Priority 1: Check explicit first name fields in DB
     const explicitFirst =
-      (p.first_name as string | undefined) ??
-      (p.firstName as string | undefined)
+      (p.first_name as string | undefined) ?? (p.firstName as string | undefined)
     if (explicitFirst?.trim()) return explicitFirst.trim()
 
-    // Priority 2: Fallback to full name (LoadingView will parse it)
     const candidate =
       (p.full_name as string | undefined) ??
       (p.fullName as string | undefined) ??
@@ -416,8 +493,59 @@ export default function TakeExamPage() {
   }
 
   if (loadError) {
+    return <ErrorView message={loadError} onBack={() => router.push("/student")} />
+  }
+
+  if (isExcludedFromAttendance) {
     return (
-      <ErrorView message={loadError} onBack={() => router.push("/student")} />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-300">
+        <Card className="max-w-md w-full text-center p-6 sm:p-8 border-amber-200 dark:border-amber-900/50 shadow-xl rounded-2xl bg-white dark:bg-slate-900">
+          <div className="h-16 w-16 bg-amber-100 dark:bg-amber-950/60 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-800/60">
+            <UserX className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2">
+            Exam Hall Verification Required
+          </h2>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 mb-4 border border-amber-300/40 dark:border-amber-700/40">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Marked Absent on Hall Attendance
+          </div>
+
+          <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-6">
+            You were marked absent when this examination session was published. Remote access is locked to ensure examination hall integrity.
+          </p>
+
+          <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl text-xs text-slate-600 dark:text-slate-400 mb-6 text-left border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <p className="font-semibold text-slate-800 dark:text-slate-200">How to gain access:</p>
+            <p>1. Present yourself to the invigilator in the hall.</p>
+            <p>2. Ask the invigilator to click <strong>"Admit Late"</strong> for you.</p>
+            <p>3. This screen will automatically unlock, or you can click below.</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/student/exams")}
+              className="w-full sm:flex-1 rounded-xl"
+            >
+              Back to Exams
+            </Button>
+            <Button
+              onClick={handleCheckAdmissionStatus}
+              disabled={isCheckingAdmission}
+              className="w-full sm:flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
+            >
+              {isCheckingAdmission ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Checking...</>
+              ) : (
+                <><RefreshCw className="w-4 h-4 mr-2" />Check Status</>
+              )}
+            </Button>
+          </div>
+        </Card>
+      </div>
     )
   }
 
@@ -426,25 +554,14 @@ export default function TakeExamPage() {
       <div className="min-h-screen bg-red-50 dark:bg-red-950/20 flex items-center justify-center p-4 transition-colors duration-300">
         <Card className="max-w-md w-full text-center p-8 border-red-200 dark:border-red-900/50 shadow-lg rounded-2xl bg-white dark:bg-slate-900">
           <div className="h-16 w-16 bg-red-100 dark:bg-red-950/50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle
-              className="h-10 w-10 text-red-500 dark:text-red-400"
-              aria-hidden="true"
-            />
+            <XCircle className="h-10 w-10 text-red-500 dark:text-red-400" aria-hidden="true" />
           </div>
-          <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">
-            Exam Terminated
-          </h2>
-          <p className="text-red-600 dark:text-red-300 mb-4">
-            Security Policy Violation
-          </p>
+          <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-2">Exam Terminated</h2>
+          <p className="text-red-600 dark:text-red-300 mb-4">Security Policy Violation</p>
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
-            Your answers have been saved and this attempt is recorded with your
-            current score.
+            Your answers have been saved and this attempt is recorded with your current score.
           </p>
-          <Button
-            onClick={() => router.push("/student/exams")}
-            className="w-full rounded-xl"
-          >
+          <Button onClick={() => router.push("/student/exams")} className="w-full rounded-xl">
             Back to Exams
           </Button>
         </Card>
@@ -508,10 +625,7 @@ export default function TakeExamPage() {
         role="status"
         aria-live="polite"
       >
-        <Loader2
-          className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400"
-          aria-hidden="true"
-        />
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-3">
           Restoring exam state…
         </p>
@@ -573,8 +687,7 @@ export default function TakeExamPage() {
         isSubmitting={state.isSubmitting}
         onSubmit={() => handleSubmit(false)}
         theoryInfo={
-          derived.theoryCount > 0 &&
-          derived.requiredTheory < derived.theoryCount
+          derived.theoryCount > 0 && derived.requiredTheory < derived.theoryCount
             ? {
                 required: derived.requiredTheory,
                 total: derived.theoryCount,
