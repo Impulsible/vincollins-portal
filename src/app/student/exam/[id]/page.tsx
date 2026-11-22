@@ -61,13 +61,28 @@ function resolveExamDuration(exam: any): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 60
 }
 
-async function requestFullscreen(): Promise<void> {
+/**
+ * Safely requests fullscreen only when supported and does not crash if browser blocks it.
+ */
+async function safeRequestFullscreen(): Promise<boolean> {
+  if (typeof document === "undefined") return false
+  if (document.fullscreenElement) return true
+
   const el = document.documentElement
   const fn =
     el.requestFullscreen ??
     (el as unknown as { webkitRequestFullscreen?: () => Promise<void> })
       .webkitRequestFullscreen
-  if (fn) await fn.call(el)
+
+  if (!fn) return false
+
+  try {
+    await fn.call(el)
+    return true
+  } catch {
+    // Browser blocked automatic fullscreen (user gesture required)
+    return false
+  }
 }
 
 // ── Page Component ─────────────────────────────────────────────────────────
@@ -124,19 +139,17 @@ export default function TakeExamPage() {
   const dynamicBaseDuration = useMemo(() => resolveExamDuration(exam), [exam])
   const totalDurationMinutes = dynamicBaseDuration + dbExtraMinutes
 
-  // FIX: only UUID-shaped identifiers can match excluded_student_ids (uuid[]).
-  // Admission numbers are text and would never match a uuid[] element.
   const studentCandidateIds = useMemo<string[]>(() => {
     if (!profile) return []
     const p = profile as Record<string, any>
     const ids = [p.id, p.user_id, p.userId, p.student_id, p.studentId]
       .filter(Boolean)
       .map(String)
-      .filter(id => UUID_RE.test(id))
+      .filter((id) => UUID_RE.test(id))
     return Array.from(new Set(ids))
   }, [profile])
 
-  // ── Realtime Attendance & Block Listener ───────────────────────────────
+  // ── Realtime Attendance & Block Listener (with bfcache cleanup) ────────
   useEffect(() => {
     if (!examId || studentCandidateIds.length === 0) return
 
@@ -144,11 +157,11 @@ export default function TakeExamPage() {
     const channel = supabase
       .channel(`exam-admission-${examId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'exams',
+          event: "UPDATE",
+          schema: "public",
+          table: "exams",
           filter: `id=eq.${examId}`,
         },
         (payload: any) => {
@@ -156,7 +169,7 @@ export default function TakeExamPage() {
             .map(String)
             .map((s: string) => s.toLowerCase())
 
-          const stillExcluded = studentCandidateIds.some(id =>
+          const stillExcluded = studentCandidateIds.some((id) =>
             excludedList.includes(id.toLowerCase())
           )
 
@@ -171,11 +184,17 @@ export default function TakeExamPage() {
       )
       .subscribe()
 
-    return () => {
+    const handlePageHide = () => {
       supabase.removeChannel(channel)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examId, studentCandidateIds])
+
+    window.addEventListener("pagehide", handlePageHide)
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide)
+      supabase.removeChannel(channel)
+    }
+  }, [examId, studentCandidateIds, state.examStarted])
 
   const { extraMinutes: liveExtraMinutes } = useExtraTimeSync({
     attemptId: attemptId ?? undefined,
@@ -344,7 +363,6 @@ export default function TakeExamPage() {
 
       restoreTimerRef.current = setTimeout(() => {
         dispatch({ type: "SET_FULLY_RESTORED" })
-        requestFullscreen().catch(() => {})
       }, EXAM_CONFIG.FULLSCREEN_RESTORE_DELAY_MS)
 
       return true
@@ -353,6 +371,10 @@ export default function TakeExamPage() {
   )
 
   const onResumeExam = useCallback(async () => {
+    // User clicked "Resume Exam" -> user gesture is active here!
+    await safeRequestFullscreen()
+    setFullscreen(true)
+
     const data = await handleResumeExam()
     if (!data?.attemptId) return
     const knownStartMs = parseStartMs(data.started_at)
@@ -361,7 +383,7 @@ export default function TakeExamPage() {
       return
     }
     await enterExam(data.attemptId, data.answers ?? {}, knownStartMs, undefined)
-  }, [handleResumeExam, enterExam])
+  }, [handleResumeExam, enterExam, setFullscreen])
 
   useEffect(() => {
     if (isResumeQuery && resumeData && !state.examStarted && !showResumeDialog) {
@@ -370,11 +392,12 @@ export default function TakeExamPage() {
   }, [isResumeQuery, resumeData, state.examStarted, showResumeDialog, onResumeExam])
 
   const startExam = useCallback(async () => {
+    // 1. Enter fullscreen directly inside the click event handler
+    await safeRequestFullscreen()
+    setFullscreen(true)
+
     dispatch({ type: "START_EXAM_BEGIN" })
     try {
-      await requestFullscreen()
-      setFullscreen(true)
-
       const result = await startNewAttempt()
       if (!result) {
         dispatch({ type: "START_EXAM_FAIL" })
@@ -395,12 +418,12 @@ export default function TakeExamPage() {
   }, [dispatch, setFullscreen, startNewAttempt, enterExam])
 
   const handleReturnToFullscreen = useCallback(async () => {
-    try {
-      await requestFullscreen()
+    const success = await safeRequestFullscreen()
+    if (success) {
       setFullscreen(true)
       setTimeout(() => setShowFullscreenPrompt(false), EXAM_CONFIG.FULLSCREEN_PROMPT_DISMISS_MS)
-    } catch {
-      toast.error("Please press F11 to enter fullscreen.")
+    } else {
+      toast.error("Please click again or press F11 to enter fullscreen.")
     }
   }, [setFullscreen, setShowFullscreenPrompt])
 
@@ -415,7 +438,7 @@ export default function TakeExamPage() {
 
     if (excludedList.length === 0) return false
 
-    return studentCandidateIds.some(id => excludedList.includes(id.toLowerCase()))
+    return studentCandidateIds.some((id) => excludedList.includes(id.toLowerCase()))
   }, [exam, studentCandidateIds, locallyAdmitted])
 
   const handleCheckAdmissionStatus = async () => {
@@ -423,9 +446,9 @@ export default function TakeExamPage() {
     try {
       const supabase = createClient()
       const { data, error } = await supabase
-        .from('exams')
-        .select('excluded_student_ids, is_published, is_active, is_archived, status')
-        .eq('id', examId)
+        .from("exams")
+        .select("excluded_student_ids, is_published, is_active, is_archived, status")
+        .eq("id", examId)
         .single()
 
       if (error) throw error
@@ -434,7 +457,7 @@ export default function TakeExamPage() {
         data?.is_published === true &&
         data?.is_active === true &&
         data?.is_archived !== true &&
-        data?.status === 'published'
+        data?.status === "published"
 
       if (!stillLive) {
         toast.error("This exam is no longer available.")
@@ -446,7 +469,7 @@ export default function TakeExamPage() {
         .map(String)
         .map((s: string) => s.toLowerCase())
 
-      const stillExcluded = studentCandidateIds.some(id =>
+      const stillExcluded = studentCandidateIds.some((id) =>
         excludedList.includes(id.toLowerCase())
       )
 
@@ -538,9 +561,13 @@ export default function TakeExamPage() {
               className="w-full sm:flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
             >
               {isCheckingAdmission ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Checking...</>
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />Checking...
+                </>
               ) : (
-                <><RefreshCw className="w-4 h-4 mr-2" />Check Status</>
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />Check Status
+                </>
               )}
             </Button>
           </div>

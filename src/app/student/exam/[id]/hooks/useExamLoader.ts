@@ -66,12 +66,43 @@ function shuffleArray<T>(array: T[]): T[] {
  */
 function processExamQuestions(
   rawQuestions: Question[],
-  subjectName?: string | null,
+  subjectInput?: any,
   examSettings: { shuffle_questions?: boolean; shuffle_options?: boolean } = {},
-  examTitle?: string | null
+  examTitleInput?: any,
+  fullExamData?: any
 ): Question[] {
-  // Check if subject or title is protected (Yoruba, French, English, etc.)
-  const isExcludedSubject = isSubjectExcludedFromShuffle(subjectName, examTitle);
+  // Normalize subject string
+  const subjectStr =
+    typeof subjectInput === "string"
+      ? subjectInput
+      : subjectInput?.name || subjectInput?.title || subjectInput?.subject || "";
+
+  // Normalize title string
+  const titleStr =
+    typeof examTitleInput === "string"
+      ? examTitleInput
+      : examTitleInput?.title || examTitleInput?.name || "";
+
+  // Combine title with any descriptive metadata to catch diacritics / keywords
+  const extraStr =
+    typeof fullExamData === "string"
+      ? fullExamData
+      : [
+          fullExamData?.description,
+          fullExamData?.instructions,
+          fullExamData?.subject_name,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+  const combinedTitleContext = [titleStr, extraStr].filter(Boolean).join(" ");
+
+  // Check if subject or title/context is protected (Yoruba, French, English, etc.)
+  // Passes exactly 2 arguments conforming to (subject?: string, examTitle?: string)
+  const isExcludedSubject = isSubjectExcludedFromShuffle(
+    subjectStr,
+    combinedTitleContext
+  );
 
   // Tier 1: Question Shuffling Rule
   const allowQuestionShuffle = isExcludedSubject
@@ -89,9 +120,32 @@ function processExamQuestions(
     orderedQuestions = shuffleArray(orderedQuestions);
   } else {
     // Preserve strict original order created by teacher
-    orderedQuestions = orderedQuestions.sort(
-      (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)
-    );
+    orderedQuestions = orderedQuestions.sort((a: any, b: any) => {
+      const numA = Number(
+        a.order_index ??
+          a.q_index ??
+          a.question_number ??
+          a.question_index ??
+          a.display_order ??
+          a.display_number
+      );
+      const numB = Number(
+        b.order_index ??
+          b.q_index ??
+          b.question_number ??
+          b.question_index ??
+          b.display_order ??
+          b.display_number
+      );
+
+      if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
+        return numA - numB;
+      }
+      if (a.created_at && b.created_at) {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return 0;
+    });
   }
 
   // 2. Order Options for each Question
@@ -101,18 +155,27 @@ function processExamQuestions(
     if (Array.isArray(q.options)) {
       options = q.options.map((opt) => {
         if (typeof opt === "string") return opt;
-
         if (typeof opt === "object" && opt !== null && "text" in opt) {
           const text = (opt as { text?: unknown }).text;
           return typeof text === "string" ? text : String(text ?? "");
         }
-
         return String(opt ?? "");
       });
     } else if (typeof q.options === "string") {
       try {
         const parsed = JSON.parse(q.options);
-        options = Array.isArray(parsed) ? parsed : [];
+        if (Array.isArray(parsed)) {
+          options = parsed.map((opt) => {
+            if (typeof opt === "string") return opt;
+            if (typeof opt === "object" && opt !== null && "text" in opt) {
+              const text = (opt as { text?: unknown }).text;
+              return typeof text === "string" ? text : String(text ?? "");
+            }
+            return String(opt ?? "");
+          });
+        } else {
+          options = [];
+        }
       } catch {
         options = [];
       }
@@ -139,7 +202,7 @@ function processExamQuestions(
 
 export function useExamLoader(
   examId: string,
-  router: ReturnType<typeof useRouter>,
+  router: ReturnType<typeof useRouter>
 ): UseExamLoaderReturn {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -165,7 +228,7 @@ export function useExamLoader(
     setLoadError(null);
 
     try {
-      // 1. Auth
+      // 1. Auth Check
       let session: { userId: string; email: string };
       try {
         session = await requireSession();
@@ -174,11 +237,11 @@ export function useExamLoader(
         return;
       }
 
-      // 2. Profile
+      // 2. Profile Fetch
       const userProfile = await fetchProfile(session.userId);
       if (userProfile) setProfile(userProfile);
 
-      // 3. Exam
+      // 3. Exam Fetch
       let examData: Exam;
       try {
         examData = await fetchExam(examId);
@@ -199,7 +262,7 @@ export function useExamLoader(
         examData.subject || (examData as any).subject_name || "";
       const examTitle = examData.title || "";
 
-      // Enforces locked shuffle for Yoruba, French, English across ALL published/existing exams
+      // Enforces locked shuffle for Yoruba, French, English, etc.
       const processedQuestions = processExamQuestions(
         normalizedQuestions,
         subjectName,
@@ -210,21 +273,25 @@ export function useExamLoader(
               ? examData.shuffle_options
               : undefined,
         },
-        examTitle
+        examTitle,
+        examData
       );
       setAllQuestions(processedQuestions);
 
       const objectiveMax = objectiveCount || examData.objective_max || 20;
-      const theoryMax = theoryCount > 0 ? examData.theory_max || 40 : 0;
+      const theoryMax =
+        theoryCount > 0
+          ? examData.theory_max ?? Math.max(0, 60 - objectiveMax)
+          : 0;
       const actualTotalMarks = objectiveMax + theoryMax;
 
       // 5. Dynamic Duration Resolution
       const dynamicDuration = resolveExamDuration(examData);
 
-      // 6. Attempts
+      // 6. Attempts Resolution
       const allAttempts = await fetchAttempts(
         examId,
-        userProfile?.id ?? session.userId,
+        userProfile?.id ?? session.userId
       );
       const completed = getCompletedAttempts(allAttempts);
       const active = getActiveAttempt(allAttempts);
@@ -246,7 +313,7 @@ export function useExamLoader(
               theoryMax,
               actualTotalMarks,
               completedCount,
-            }),
+            })
           );
           return;
         }
@@ -274,7 +341,7 @@ export function useExamLoader(
         const originalStartedAt = latest.started_at;
         if (!originalStartedAt) {
           toast.error(
-            "Exam data corrupted — missing start time. Contact support.",
+            "Exam data corrupted — missing start time. Contact support."
           );
           return;
         }
@@ -310,7 +377,7 @@ export function useExamLoader(
             theoryMax,
             actualTotalMarks,
             completedCount,
-          }),
+          })
         );
         return;
       }
@@ -331,14 +398,14 @@ export function useExamLoader(
               theoryMax,
               actualTotalMarks,
               completedCount,
-            }),
+            })
           );
           return;
         }
 
         if (
           ["completed", "pending_theory", "graded"].includes(
-            String(latest.status),
+            String(latest.status)
           )
         ) {
           setHasCompletedAttempt(true);
@@ -350,13 +417,13 @@ export function useExamLoader(
               theoryMax,
               actualTotalMarks,
               completedCount,
-            }),
+            })
           );
           return;
         }
       }
 
-      // Case C: Fresh attempt
+      // Case C: Fresh attempt ready
       setAttemptsUsed(0);
       setHasCompletedAttempt(false);
       setAttemptId(null);
@@ -402,10 +469,13 @@ export function useExamLoader(
 
         const objCount = allQuestions.filter((q) => q.type !== "theory").length;
         const theoCount = allQuestions.filter(
-          (q) => q.type === "theory",
+          (q) => q.type === "theory"
         ).length;
         const objectiveMax = objCount || exam.objective_max || 20;
-        const theoryMax = theoCount > 0 ? exam.theory_max || 40 : 0;
+        const theoryMax =
+          theoCount > 0
+            ? exam.theory_max ?? Math.max(0, 60 - objectiveMax)
+            : 0;
         const actualTotalMarks = objectiveMax + theoryMax;
 
         setExamTerminated(false);
@@ -428,7 +498,7 @@ export function useExamLoader(
       }
     }, [examId, exam, profile, allQuestions]);
 
-  // ── Resume ─────────────────────────────────────────────────────────────
+  // ── Resume Existing Attempt ────────────────────────────────────────────
 
   const handleResumeExam = useCallback(async (): Promise<ResumeData | null> => {
     if (!resumeData) return null;
