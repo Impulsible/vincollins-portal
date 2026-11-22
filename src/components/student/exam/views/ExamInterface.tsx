@@ -39,7 +39,6 @@ import {
   Image as ImageIcon,
   Eye,
   EyeOff,
-  Bookmark,
 } from "lucide-react";
 
 type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
@@ -57,6 +56,20 @@ const removeMarksFromText = (text: string): string => {
     .replace(/\s*\d+\s*marks?\s*$/gi, "")
     .replace(/\n\s*\d+\s*marks?\s*\n/gi, "\n")
     .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+/**
+ * Strips section dividers, trailing headers, or markdown leaks that accidentally
+ * attached to the end of an option choice (e.g. Option D).
+ */
+const cleanOptionText = (text: string): string => {
+  if (!text) return "";
+  return text
+    .replace(
+      /\s*(?:---|___|\*\*\*|===|##+|###+|SECTION\b|PART\b|OBJECTIVES?\b|THEORY\b|INSTRUCTIONS?\b|DIRECTIONS?\b|CHOISISSEZ\b|CHOOSE\b|READ\b)[\s\S]*$/i,
+      ""
+    )
     .trim();
 };
 
@@ -213,16 +226,22 @@ function ObjectiveQuestionCard({
 }) {
   const rawQuestionText = question?.question || question?.question_text || "";
   const cleanedText = removeMarksFromText(rawQuestionText);
-  const options: string[] = (question?.options || []).filter(Boolean);
+  
+  // Clean each option choice to prevent leaked dividers/headings from rendering inside pills
+  const options: string[] = (question?.options || [])
+    .filter(Boolean)
+    .map((opt) => cleanOptionText(String(opt)));
 
   const imageUrl = question?.image_url || (question as any)?.imageUrl;
   const imageCaption = question?.image_caption || (question as any)?.imageCaption;
-  
+
   // Authoritative Section Header / Sub-Header parsed from objective text
   const sectionHeader =
     (question as any)?.section_header ||
+    (question as any)?.sectionHeader ||
     (question as any)?.section ||
-    (question as any)?.instruction;
+    (question as any)?.instruction ||
+    (question as any)?.instructions;
 
   return (
     <div className="relative rounded-3xl border border-indigo-200/70 dark:border-indigo-800/50 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
@@ -266,11 +285,10 @@ function ObjectiveQuestionCard({
 
       {/* Card Content Body */}
       <div className="p-5 sm:p-6 space-y-5">
-        
         {/* SECTION / SUB-HEADER BANNER (e.g., Section A, French/Yoruba Instructions) */}
         {sectionHeader && (
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/40 dark:from-blue-950/50 dark:via-indigo-950/30 dark:to-purple-950/20 border-l-4 border-indigo-600 dark:border-indigo-400 border-y border-r dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200 shadow-2xs">
-            <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-950/40 dark:via-orange-950/20 dark:to-yellow-950/30 border-l-4 border-amber-500 dark:border-amber-400 border-y border-r border-amber-200/60 dark:border-amber-900/40 text-amber-950 dark:text-amber-200 shadow-2xs">
+            <Layers className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
             <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider block">
                 {sectionHeader}
@@ -292,7 +310,7 @@ function ObjectiveQuestionCard({
           </div>
         </div>
 
-        {/* Option Choices: Dynamic Grid based on choices (2 to 6+ choices) */}
+        {/* Option Choices: Dynamic Grid based on choices (2 to 8 choices) */}
         <div
           className={cn(
             "gap-2.5 pl-0 sm:pl-11 grid",
@@ -560,7 +578,7 @@ export function ExamInterface({
 
   // ── Persistence Key for Reading Passage ──
   const passageStorageKey = useMemo(() => {
-    return `cbt_passage_expanded_${exam?.id || 'default'}`;
+    return `cbt_passage_expanded_${exam?.id || "default"}`;
   }, [exam?.id]);
 
   // Load manual minimize/expand preference from localStorage on mount
@@ -600,7 +618,7 @@ export function ExamInterface({
     : false;
 
   const currentSubQuestions: TheorySubQuestion[] = Array.isArray(
-    currentQuestion?.sub_questions,
+    currentQuestion?.sub_questions
   )
     ? (currentQuestion.sub_questions as TheorySubQuestion[])
     : [];
@@ -655,22 +673,23 @@ export function ExamInterface({
       typeof currentQuestion.question === "string"
         ? currentQuestion.question
         : typeof currentQuestion.question_text === "string"
-          ? currentQuestion.question_text
-          : "",
+        ? currentQuestion.question_text
+        : "",
     question_text:
       typeof currentQuestion.question_text === "string"
         ? currentQuestion.question_text
         : typeof currentQuestion.question === "string"
-          ? currentQuestion.question
-          : "",
+        ? currentQuestion.question
+        : "",
     marks:
       typeof currentQuestion.marks === "number"
         ? currentQuestion.marks
         : typeof currentQuestion.points === "number"
-          ? currentQuestion.points
-          : 10,
+        ? currentQuestion.points
+        : 10,
     section_header:
       (currentQuestion as any).section_header ||
+      (currentQuestion as any).sectionHeader ||
       (currentQuestion as any).section ||
       undefined,
     sub_questions: currentSubQuestions,

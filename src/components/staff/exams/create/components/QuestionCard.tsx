@@ -1,13 +1,24 @@
-// src/components/staff/exams/create/components/QuestionCard.tsx - WITH COMPLETE DARK MODE
+// src/components/staff/exams/create/components/QuestionCard.tsx
+'use client';
 
-"use client";
+import { useState } from 'react';
+import {
+  Trash2,
+  Table,
+  BarChart3,
+  Image,
+  FileText,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  CheckCircle2,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import type { Question, TheoryQuestion, TheorySubQuestion } from '../types';
 
-import { useState } from "react";
-import { Trash2, Table, BarChart3, Image, FileText, ChevronDown, ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import type { Question, TheoryQuestion, TheorySubQuestion } from "../types";
+/* ─── Inspection Helpers ─── */
 
 const hasTable = (text: string): boolean => {
   if (!text) return false;
@@ -19,41 +30,102 @@ const hasTable = (text: string): boolean => {
 
 const hasChart = (text: string): boolean => {
   if (!text) return false;
-  const chartKeywords = ['chart', 'graph', 'diagram', 'plot', 'bar chart', 'pie chart', 'line graph', 'histogram', 'scatter plot'];
-  return chartKeywords.some(keyword => text.toLowerCase().includes(keyword));
+  const chartKeywords = [
+    'chart',
+    'graph',
+    'diagram',
+    'plot',
+    'bar chart',
+    'pie chart',
+    'line graph',
+    'histogram',
+    'scatter plot',
+  ];
+  return chartKeywords.some((keyword) => text.toLowerCase().includes(keyword));
 };
 
 const hasImage = (text: string): boolean => {
   if (!text) return false;
-  return text.includes('![') && text.includes('](') ||
-         text.includes('<img') ||
-         text.includes('data:image');
+  return (
+    (text.includes('![') && text.includes('](')) ||
+    text.includes('<img') ||
+    text.includes('data:image')
+  );
 };
 
 const hasMath = (text: string): boolean => {
   if (!text) return false;
-  return text.includes('=') || 
-         text.includes('+') || 
-         text.includes('-') || 
-         text.includes('*') || 
-         text.includes('/') ||
-         Boolean(text.match(/[a-z]=\d+/)) ||
-         text.includes('∑') ||
-         text.includes('∫') ||
-         text.includes('√');
+  return (
+    text.includes('=') ||
+    text.includes('+') ||
+    text.includes('-') ||
+    text.includes('*') ||
+    text.includes('/') ||
+    Boolean(text.match(/[a-z]=\d+/)) ||
+    text.includes('∑') ||
+    text.includes('∫') ||
+    text.includes('√')
+  );
 };
 
-const renderContent = (text: string, maxLength: number = 120, isExpanded: boolean = false) => {
+/**
+ * Strips leaked dividers (---), markdown headings (##, ###), and instruction
+ * phrases from options if an un-sanitized question is passed in.
+ */
+const cleanOptionDisplay = (opt: string): string => {
+  if (!opt || typeof opt !== 'string') return '';
+  const split = opt.split(
+    /\s*(?:---|___|\*\*\*|===|##+|###+|SECTION\b|PART\b|OBJECTIVES?\b|CHOISISSEZ\b)/i
+  );
+  return split[0].trim();
+};
+
+const convertMarkdownTableToHtml = (tableLines: string[]): string => {
+  let html = '<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">';
+  let isHeader = true;
+
+  for (const line of tableLines) {
+    if (line.includes('---') || line.includes('===')) {
+      isHeader = false;
+      continue;
+    }
+    if (line.startsWith('|')) {
+      const cells = line.split('|').filter((cell: string) => cell.trim() !== '');
+      if (cells.length === 0) continue;
+      const tag = isHeader ? 'th' : 'td';
+      const cellClass = isHeader
+        ? 'px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider bg-gray-50 dark:bg-gray-800'
+        : 'px-3 py-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap';
+      html +=
+        '<tr class="' +
+        (isHeader ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors') +
+        '">';
+      cells.forEach((cell: string) => {
+        html += `<${tag} class="${cellClass} border border-gray-200 dark:border-gray-700">${cell.trim()}</${tag}>`;
+      });
+      html += '</tr>';
+      isHeader = false;
+    }
+  }
+  html += '</table>';
+  return html;
+};
+
+const renderContent = (
+  text: string,
+  maxLength: number = 120,
+  isExpanded: boolean = false
+) => {
   if (!text) return null;
 
   if (text.includes('|') && text.includes('---')) {
-    const lines = text.split('\n').filter(line => line.includes('|'));
+    const lines = text.split('\n').filter((line) => line.includes('|'));
     if (lines.length > 1) {
       const tableHtml = convertMarkdownTableToHtml(lines);
       if (tableHtml) {
         return (
           <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <div 
+            <div
               className="w-full text-xs md:text-sm [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-200 [&_td]:border-gray-200 dark:[&_th]:border-gray-700 dark:[&_td]:border-gray-700 [&_th]:px-3 [&_td]:px-3 [&_th]:py-2 [&_td]:py-2 [&_th]:bg-gray-50 dark:[&_th]:bg-gray-800 [&_th]:font-semibold [&_th]:text-left [&_td]:text-gray-700 dark:[&_td]:text-gray-300"
               dangerouslySetInnerHTML={{ __html: tableHtml }}
             />
@@ -68,7 +140,7 @@ const renderContent = (text: string, maxLength: number = 120, isExpanded: boolea
     if (tableMatch) {
       return (
         <div className="mt-2 overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-          <div 
+          <div
             className="w-full text-xs md:text-sm [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-200 [&_td]:border-gray-200 dark:[&_th]:border-gray-700 dark:[&_td]:border-gray-700 [&_th]:px-3 [&_td]:px-3 [&_th]:py-2 [&_td]:py-2 [&_th]:bg-gray-50 dark:[&_th]:bg-gray-800 [&_th]:font-semibold [&_th]:text-left [&_td]:text-gray-700 dark:[&_td]:text-gray-300"
             dangerouslySetInnerHTML={{ __html: tableMatch[0] }}
           />
@@ -86,9 +158,11 @@ const renderContent = (text: string, maxLength: number = 120, isExpanded: boolea
   }
 
   if (hasMath(text) && !isExpanded) {
-    const lines = text.split('\n').filter(line => line.trim().length > 0);
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
     const hasMultipleLines = lines.length > 3;
-    const displayText = hasMultipleLines ? lines.slice(0, 3).join('\n') + (lines.length > 3 ? '\n...' : '') : text;
+    const displayText = hasMultipleLines
+      ? lines.slice(0, 3).join('\n') + (lines.length > 3 ? '\n...' : '')
+      : text;
     return (
       <pre className="mt-1 text-xs font-mono bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto text-gray-700 dark:text-gray-300">
         {displayText}
@@ -97,61 +171,51 @@ const renderContent = (text: string, maxLength: number = 120, isExpanded: boolea
   }
 
   let displayText = text;
-  if (maxLength && !isExpanded && !text.includes('|') && !text.includes('<table') && !hasMath(text)) {
-    displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  if (
+    maxLength &&
+    !isExpanded &&
+    !text.includes('|') &&
+    !text.includes('<table') &&
+    !hasMath(text)
+  ) {
+    displayText =
+      text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   }
 
-  const paragraphs = displayText.split('\n').filter(p => p.trim().length > 0);
-  
+  const paragraphs = displayText.split('\n').filter((p) => p.trim().length > 0);
+
   if (paragraphs.length > 1) {
     return (
       <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
         {paragraphs.slice(0, isExpanded ? paragraphs.length : 2).map((p, i) => (
-          <p key={i} className="leading-relaxed">{p}</p>
+          <p key={i} className="leading-relaxed">
+            {p}
+          </p>
         ))}
         {!isExpanded && paragraphs.length > 2 && (
-          <p className="text-gray-400 dark:text-gray-500 text-xs">... {paragraphs.length - 2} more lines</p>
+          <p className="text-gray-400 dark:text-gray-500 text-xs">
+            ... {paragraphs.length - 2} more lines
+          </p>
         )}
       </div>
     );
   }
 
-  return <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{displayText}</span>;
+  return (
+    <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+      {displayText}
+    </span>
+  );
 };
 
-const convertMarkdownTableToHtml = (tableLines: string[]): string => {
-  let html = '<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">';
-  let isHeader = true;
-  
-  for (const line of tableLines) {
-    if (line.includes('---') || line.includes('===')) {
-      isHeader = false;
-      continue;
-    }
-    if (line.startsWith('|')) {
-      const cells = line.split('|').filter((cell: string) => cell.trim() !== '');
-      if (cells.length === 0) continue;
-      const tag = isHeader ? 'th' : 'td';
-      const cellClass = isHeader 
-        ? 'px-3 py-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wider bg-gray-50 dark:bg-gray-800'
-        : 'px-3 py-2 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap';
-      html += '<tr class="' + (isHeader ? '' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors') + '">';
-      cells.forEach((cell: string) => {
-        html += `<${tag} class="${cellClass} border border-gray-200 dark:border-gray-700">${cell.trim()}</${tag}>`;
-      });
-      html += '</tr>';
-      isHeader = false;
-    }
-  }
-  html += '</table>';
-  return html;
-};
-
-const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
+const renderSubQuestions = (
+  subQuestions: TheorySubQuestion[],
+  level: number = 0
+) => {
   if (!subQuestions || subQuestions.length === 0) return null;
-  
+
   const startCharCode = level === 0 ? 97 : 105;
-  
+
   return (
     <div className={`mt-2 ${level > 0 ? 'ml-6' : 'ml-4'} space-y-1.5`}>
       <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
@@ -161,9 +225,12 @@ const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0
         const hasTableContent = hasTable(sq.text || '');
         const hasChartContent = hasChart(sq.text || '');
         const subPoints = (sq as any).points || 0;
-        
+
         return (
-          <div key={idx} className="pl-3 border-l-2 border-purple-200 dark:border-purple-800">
+          <div
+            key={idx}
+            className="pl-3 border-l-2 border-purple-200 dark:border-purple-800"
+          >
             <div className="text-sm">
               <span className="font-medium text-purple-600 dark:text-purple-400">
                 {String.fromCharCode(startCharCode + idx)}.
@@ -172,16 +239,26 @@ const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0
                 {renderContent(sq.text || '', 100, false)}
               </span>
               {subPoints > 0 && (
-                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">({subPoints} marks)</span>
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                  ({subPoints} marks)
+                </span>
               )}
               {hasTableContent && (
-                <Badge variant="outline" className="ml-2 text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                  <Table className="h-2.5 w-2.5 mr-0.5" />Table
+                <Badge
+                  variant="outline"
+                  className="ml-2 text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+                >
+                  <Table className="h-2.5 w-2.5 mr-0.5" />
+                  Table
                 </Badge>
               )}
               {hasChartContent && (
-                <Badge variant="outline" className="ml-1 text-[10px] bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-                  <BarChart3 className="h-2.5 w-2.5 mr-0.5" />Chart
+                <Badge
+                  variant="outline"
+                  className="ml-1 text-[10px] bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                >
+                  <BarChart3 className="h-2.5 w-2.5 mr-0.5" />
+                  Chart
                 </Badge>
               )}
             </div>
@@ -195,44 +272,208 @@ const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0
   );
 };
 
+/* ─── Objective Card Component ─── */
+
 interface ObjectiveCardProps {
   question: Question;
   index: number;
   onDelete: (id: string) => void;
 }
 
-export function ObjectiveCard({ question, index, onDelete }: ObjectiveCardProps) {
+export function ObjectiveCard({
+  question,
+  index,
+  onDelete,
+}: ObjectiveCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const sectionHeader =
+    (question as any).section_header || (question as any).section;
+  const rawOptions = Array.isArray(question.options) ? question.options : [];
+
+  const hasTableContent = hasTable(question.question);
+  const hasChartContent = hasChart(question.question);
+  const hasImageContent = hasImage(question.question) || Boolean(question.image_url);
+  const hasMathContent = hasMath(question.question);
+
   return (
-    <div className="flex items-start gap-3 p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all group shadow-sm hover:shadow">
-      <div className="w-7 h-7 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-400 flex-shrink-0">
-        {index + 1}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-          {question.question}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <Badge variant="outline" className="text-xs h-5 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400">
-            {question.marks} marks
-          </Badge>
-          {question.options && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {question.options.length} options
-            </span>
+    <div
+      className={cn(
+        'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all group shadow-xs space-y-2.5',
+        isExpanded ? 'p-4' : 'p-3'
+      )}
+    >
+      {/* Optional Section Sub-header */}
+      {sectionHeader && (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
+          <Layers className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="truncate">{sectionHeader}</span>
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        <div className="w-7 h-7 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-400 flex-shrink-0">
+          {index + 1}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+            {renderContent(question.question, isExpanded ? 1000 : 120, isExpanded)}
+          </div>
+
+          {/* Optional Diagram Thumbnail */}
+          {question.image_url && (
+            <div className="mt-2 flex items-center gap-2">
+              <img
+                src={question.image_url}
+                alt="Diagram"
+                className="h-12 w-12 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+              />
+              {question.image_caption && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  {question.image_caption}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Options Display Preview */}
+          {rawOptions.length > 0 && (
+            <div
+              className={cn(
+                'grid gap-1.5 mt-2.5',
+                rawOptions.length <= 4
+                  ? 'grid-cols-1 sm:grid-cols-2'
+                  : 'grid-cols-1'
+              )}
+            >
+              {rawOptions.map((opt, optIdx) => {
+                const letter = String.fromCharCode(65 + optIdx);
+                const cleanOpt = cleanOptionDisplay(opt);
+                const isCorrect =
+                  cleanOpt === question.correct_answer ||
+                  opt === question.correct_answer ||
+                  letter === question.correct_answer;
+
+                return (
+                  <div
+                    key={optIdx}
+                    className={cn(
+                      'flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-colors',
+                      isCorrect
+                        ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 font-semibold'
+                        : 'border-gray-100 dark:border-gray-800/80 bg-gray-50/60 dark:bg-gray-950/40 text-gray-700 dark:text-gray-300'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold shrink-0',
+                        isCorrect
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-gray-200/80 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                      )}
+                    >
+                      {letter}
+                    </span>
+                    <span className="truncate flex-1">{cleanOpt}</span>
+                    {isCorrect && (
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0 ml-auto" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Metadata Badges */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <Badge
+              variant="outline"
+              className="text-xs h-5 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+            >
+              {question.marks} mark{question.marks === 1 ? '' : 's'}
+            </Badge>
+
+            {rawOptions.length > 0 && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {rawOptions.length} options
+              </span>
+            )}
+
+            {hasTableContent && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+              >
+                <Table className="h-3 w-3 mr-0.5" />
+                Table
+              </Badge>
+            )}
+
+            {hasChartContent && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+              >
+                <BarChart3 className="h-3 w-3 mr-0.5" />
+                Chart
+              </Badge>
+            )}
+
+            {hasMathContent && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+              >
+                <span className="font-mono text-[10px]">∑</span> Math
+              </Badge>
+            )}
+
+            {hasImageContent && (
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+              >
+                <Image className="h-3 w-3 mr-0.5" />
+                Diagram
+              </Badge>
+            )}
+          </div>
+
+          {/* Expand Toggle */}
+          {(question.question.length > 140 || hasTableContent || hasMathContent) && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronDown className="h-3 w-3" />
+                  Show less
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-3 w-3" />
+                  Show more
+                </>
+              )}
+            </button>
           )}
         </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onDelete(question.id)}
+          className="h-8 w-8 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex-shrink-0 transition-all"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => onDelete(question.id)}
-        className="h-8 w-8 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex-shrink-0 transition-all"
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
     </div>
   );
 }
+
+/* ─── Theory Card Component ─── */
 
 interface TheoryCardProps {
   question: TheoryQuestion;
@@ -242,90 +483,145 @@ interface TheoryCardProps {
 
 export function TheoryCard({ question, index, onDelete }: TheoryCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const sectionHeader =
+    (question as any).section_header || (question as any).section;
 
   const hasTableContent = hasTable(question.question);
   const hasChartContent = hasChart(question.question);
-  const hasImageContent = hasImage(question.question);
+  const hasImageContent = hasImage(question.question) || Boolean(question.image_url);
   const hasMathContent = hasMath(question.question);
-  const hasSubQuestions = question.sub_questions && question.sub_questions.length > 0;
-  const hasSubTable = question.sub_questions?.some(sq => hasTable(sq.text || ''));
+  const hasSubQuestions =
+    question.sub_questions && question.sub_questions.length > 0;
+  const hasSubTable = question.sub_questions?.some((sq) =>
+    hasTable(sq.text || '')
+  );
 
   return (
-    <div 
+    <div
       className={cn(
-        "bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all group shadow-sm hover:shadow",
-        isExpanded ? "p-4" : "p-3"
+        'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all group shadow-xs space-y-2.5',
+        isExpanded ? 'p-4' : 'p-3'
       )}
     >
+      {/* Optional Section Sub-header */}
+      {sectionHeader && (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/80 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/40 text-purple-800 dark:text-purple-300 text-[11px] font-semibold">
+          <Layers className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+          <span className="truncate">{sectionHeader}</span>
+        </div>
+      )}
+
       <div className="flex items-start gap-3">
         <div className="w-7 h-7 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center text-xs font-bold text-purple-700 dark:text-purple-400 flex-shrink-0">
           {index + 1}
         </div>
+
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
             {renderContent(question.question, isExpanded ? 1000 : 120, isExpanded)}
           </div>
 
+          {/* Optional Diagram Thumbnail */}
+          {question.image_url && (
+            <div className="mt-2 flex items-center gap-2">
+              <img
+                src={question.image_url}
+                alt="Diagram"
+                className="h-12 w-12 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+              />
+              {question.image_caption && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  {question.image_caption}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Metadata Badges */}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <Badge variant="outline" className="text-xs h-5 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400">
+            <Badge
+              variant="outline"
+              className="text-xs h-5 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+            >
               {question.marks} marks
             </Badge>
 
             {hasSubQuestions && (
               <Badge className="text-xs h-5 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                {question.sub_questions?.length || 0} part{question.sub_questions && question.sub_questions.length > 1 ? 's' : ''}
+                {question.sub_questions?.length || 0} part
+                {question.sub_questions && question.sub_questions.length > 1
+                  ? 's'
+                  : ''}
               </Badge>
             )}
 
             {hasTableContent && (
-              <Badge variant="outline" className="text-xs h-5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                <Table className="h-3 w-3 mr-0.5" />Table
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+              >
+                <Table className="h-3 w-3 mr-0.5" />
+                Table
               </Badge>
             )}
 
             {hasSubTable && (
-              <Badge variant="outline" className="text-xs h-5 bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800">
-                <Table className="h-3 w-3 mr-0.5" />Sub-table
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800"
+              >
+                <Table className="h-3 w-3 mr-0.5" />
+                Sub-table
               </Badge>
             )}
 
             {hasChartContent && (
-              <Badge variant="outline" className="text-xs h-5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-                <BarChart3 className="h-3 w-3 mr-0.5" />Chart
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+              >
+                <BarChart3 className="h-3 w-3 mr-0.5" />
+                Chart
               </Badge>
             )}
 
             {hasMathContent && (
-              <Badge variant="outline" className="text-xs h-5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800">
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+              >
                 <span className="font-mono text-[10px]">∑</span> Math
               </Badge>
             )}
 
             {hasImageContent && (
-              <Badge variant="outline" className="text-xs h-5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
-                <Image className="h-3 w-3 mr-0.5" />Image
-              </Badge>
-            )}
-
-            {question.image_url && (
-              <Badge variant="outline" className="text-xs h-5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
-                <Image className="h-3 w-3 mr-0.5" />Image
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+              >
+                <Image className="h-3 w-3 mr-0.5" />
+                Diagram
               </Badge>
             )}
 
             {(question as any).model_answer && (
-              <Badge variant="outline" className="text-xs h-5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+              <Badge
+                variant="outline"
+                className="text-xs h-5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+              >
                 📝 Model Answer
               </Badge>
             )}
           </div>
 
+          {/* Sub-questions tree */}
           {hasSubQuestions && question.sub_questions && (
             <div className="mt-3">
               {renderSubQuestions(question.sub_questions)}
             </div>
           )}
 
+          {/* Expand Toggle */}
           {(question.question.length > 200 || hasTableContent || hasMathContent) && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}

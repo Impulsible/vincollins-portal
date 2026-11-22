@@ -1,293 +1,326 @@
 // src/hooks/useQuestionParser.ts
+import { Question } from '@/components/staff/exams/create/types';
 
 export interface ParsedQuestion {
   id: string;
-  type: 'mcq' | 'objective';
+  type: 'mcq' | 'theory';
   question: string;
   options: string[];
   correct_answer: string;
   marks: number;
-  section_header?: string;
   image_url?: string;
   image_caption?: string;
+  section_header?: string;
+  section?: string;
 }
 
 export interface ParseResult<T = ParsedQuestion> {
   items: T[];
   warnings: string[];
-  skipped: number;
+  errors: string[];
+}
+
+// Section boundary & instruction detection regex
+const SECTION_DIVIDER_REGEX =
+  /^(?:---|___|\*\*\*|===|#+\s+|SECTION\b|PART\b|OBJECTIVES?\b|THEORY\b|INSTRUCTIONS?\b|DIRECTIONS?\b|CHOISISSEZ\b|CHOOSE\b|READ\b)/i;
+
+const OPTION_START_REGEX = /^[\(\[]?([A-Ha-h])[\)\]\.\:\-]\s*(.*)$/;
+const QUESTION_START_REGEX = /^(?:Question\s*)?(\d+)[\.\)\:]\s*(.+)$/i;
+const ANSWER_KEY_REGEX = /^(?:Answer|Ans|Correct|Key)[\:\-\s]+[\(\[]?([A-Ha-h]|.+?)[\)\]]?$/i;
+const MARKS_KEY_REGEX = /^(?:Marks?|Score|Points?)[\:\-\s]+(\d+(?:\.\d+)?)/i;
+
+/**
+ * Strips accidental markdown dividers or header text concatenated to an option string
+ */
+function cleanOptionLine(rawOptionText: string): { text: string; headerRemainder?: string } {
+  if (!rawOptionText) return { text: '' };
+
+  let text = rawOptionText.trim();
+  let headerRemainder: string | undefined;
+
+  // Split on inline markdown divider or header symbols
+  const inlineSplit = text.split(/\s+(?:---|___|\*\*\*|===|##+|###+|SECTION\b|PART\b|OBJECTIVES?\b|CHOISISSEZ\b)/i);
+  if (inlineSplit.length > 1) {
+    text = inlineSplit[0].trim();
+    const leaked = rawOptionText.slice(inlineSplit[0].length).replace(/^[#\s\-*_=>]+/, '').trim();
+    if (leaked) {
+      headerRemainder = leaked;
+    }
+  }
+
+  return { text, headerRemainder };
 }
 
 /**
- * Universal Subject-Agnostic Bulk Question Parser
- * Supports English, French, Yoruba, Igbo, Hausa, Mathematics, Sciences, etc.
+ * Universal Bulk Objective Question Parser
  */
 export function parseObjectiveText(
   rawText: string,
-  defaultMark = 1
+  defaultMark: number = 1
 ): ParseResult<ParsedQuestion> {
-  if (!rawText || !rawText.trim()) {
-    return { items: [], warnings: [], skipped: 0 };
-  }
-
-  const rawLines = rawText.split(/\r?\n/);
-  const questions: ParsedQuestion[] = [];
+  const lines = rawText.split(/\r?\n/);
+  const items: ParsedQuestion[] = [];
   const warnings: string[] = [];
+  const errors: string[] = [];
 
-  // Parser State
-  let persistentSection = '';
-  let transientInstruction = '';
-  let currentPromptLines: string[] = [];
+  let currentQ: Partial<ParsedQuestion> | null = null;
   let currentOptions: string[] = [];
-  let currentAnswer = '';
-  let currentMarks = defaultMark;
-  let currentImageUrl = '';
-  let currentImageCaption = '';
+  let pendingSectionHeader = '';
+  let currentOptIndex = -1;
 
-  /* ── Detection Regular Expressions ── */
-  // Matches: "A.", "A)", "(A)", "A -", "A:", "a.", "a)"
-  const OPTION_REGEX = /^\s*(?:\(?([A-F])\)|\b([A-F])[\.\)\-:])\s*(.*)$/i;
+  const commitCurrentQuestion = () => {
+    if (!currentQ || !currentQ.question) return;
 
-  // Matches: "Answer: A", "ANS: B", "Correct Answer: (C)", "Key: D", "Réponse: C", "Idahun: A"
-  const ANSWER_REGEX =
-    /^\s*(?:ANS|ANSWER|CORRECT\s*ANSWER|KEY|R[ÉE]PONSE|ÌDÁHÙN|IDAHUN|AZIZA)\s*[:=\-]\s*(.*)$/i;
+    // Filter non-empty options
+    const filteredOptions = currentOptions.map((o) => o.trim()).filter(Boolean);
 
-  // Matches: "Marks: 0.5", "Mark: 1", "Points: 2", "[0.5 marks]", "(1 mk)"
-  const MARKS_REGEX =
-    /^\s*(?:MARKS?|POINTS?|MK|MKS)\s*[:=\-]\s*([0-9]+(?:\.[0-9]+)?)/i;
-  const MARKS_BRACKET_REGEX =
-    /\[\s*([0-9]+(?:\.[0-9]+)?)\s*(?:marks?|pts?|points?|mk)?\s*\]/i;
-
-  // Matches: "1.", "1)", "Question 1:", "Q1.", "1 -", "(1)", "1:"
-  const QUESTION_START_REGEX =
-    /^\s*(?:(?:Q|QUESTION)\s*\d+[\.\)\-:]|\(?\d+\)[\.\)\-:]?|\d+[\.\)\-:])\s*(.*)$/i;
-
-  // Image markdown: ![caption](url)
-  const IMAGE_MD_REGEX = /!\[(.*?)\]\((https?:\/\/[^\s\)]+)\)/i;
-
-  // International / Multilingual Header & Directive Keywords
-  const SECTION_KEYWORDS = [
-    'SECTION',
-    'PART',
-    'MODULE',
-    'UNIT',
-    'PAPER',
-    'OBJECTIVES',
-    'OBJECTIVE',
-    'COMPREHENSION',
-    'INSTRUCTION',
-    'INSTRUCTIONS',
-    'DIRECTION',
-    'DIRECTIONS',
-    'CHOISISSEZ',
-    'COMPLETEZ',
-    'REPONDEZ', // French
-    'IPIN',
-    'ÌPÍN',
-    'AYOKA',
-    'ÀYỌKÀ',
-    'GBOLOHUN',
-    'AKOLE', // Yoruba
-    'NGALABA',
-    'NKWUKWO',
-    'IHE', // Igbo
-    'SASHE',
-    'KARANTA', // Hausa
-  ];
-
-  const isExplicitSectionHeader = (line: string): boolean => {
-    const clean = line.replace(/[*_#\[\]]/g, '').trim();
-    if (!clean || clean.length > 140) return false;
-    const upper = clean.toUpperCase();
-    return SECTION_KEYWORDS.some(
-      (kw) =>
-        upper.startsWith(kw) ||
-        upper.startsWith(`**${kw}`) ||
-        upper.includes(` ${kw} `) ||
-        upper.includes(`: ${kw}`)
-    );
-  };
-
-  const isTableLine = (line: string): boolean => {
-    const t = line.trim();
-    return t.startsWith('|') && t.endsWith('|');
-  };
-
-  /* ── Helper: Flush and build question ── */
-  const flushCurrentQuestion = () => {
-    const promptBody = currentPromptLines.join('\n').trim();
-
-    if (promptBody && currentOptions.length >= 2) {
-      const promptParts: string[] = [];
-
-      if (persistentSection) {
-        promptParts.push(`**[${persistentSection}]**`);
-      }
-      if (transientInstruction && transientInstruction !== persistentSection) {
-        promptParts.push(`*${transientInstruction}*`);
-      }
-      promptParts.push(promptBody);
-
-      const finalPrompt = promptParts.join('\n\n');
-
-      // Resolve final answer
-      let resolvedAnswer = currentAnswer;
-      if (currentAnswer) {
-        // If answer was given as letter: "A", "B", "(C)"
-        const letterMatch = currentAnswer.match(/^\(?([A-F])\)?$/i);
-        if (letterMatch) {
-          const letterIdx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
-          if (currentOptions[letterIdx]) {
-            resolvedAnswer = currentOptions[letterIdx];
-          }
-        } else {
-          // If answer is exact text of an option
-          const matchingOption = currentOptions.find(
-            (o) => o.trim().toLowerCase() === currentAnswer.trim().toLowerCase()
-          );
-          if (matchingOption) {
-            resolvedAnswer = matchingOption;
-          }
-        }
-      }
-
-      // Fallback to Option A if undefined
-      if (!resolvedAnswer) {
-        resolvedAnswer = currentOptions[0];
-        warnings.push(
-          `Question "${promptBody.slice(0, 35)}..." had no verified answer. Defaulted to Option A.`
-        );
-      }
-
-      questions.push({
-        id: crypto.randomUUID(),
-        type: 'mcq',
-        question: finalPrompt,
-        options: currentOptions,
-        correct_answer: resolvedAnswer,
-        marks: currentMarks > 0 ? currentMarks : defaultMark,
-        section_header: persistentSection || transientInstruction || undefined,
-        image_url: currentImageUrl || undefined,
-        image_caption: currentImageCaption || undefined,
-      });
-
-      // Clear transient instruction after successfully applying to item
-      transientInstruction = '';
+    if (filteredOptions.length < 2) {
+      warnings.push(
+        `Question "${currentQ.question?.slice(0, 35)}..." has fewer than 2 valid options.`
+      );
     }
 
-    // Reset item buffers
-    currentPromptLines = [];
+    // Resolve correct answer letter (e.g. "B" -> option text or keep string)
+    let resolvedAnswer = (currentQ.correct_answer || '').trim();
+    if (resolvedAnswer.length === 1 && /^[A-Ha-h]$/i.test(resolvedAnswer)) {
+      const idx = resolvedAnswer.toUpperCase().charCodeAt(0) - 65;
+      if (filteredOptions[idx]) {
+        resolvedAnswer = filteredOptions[idx];
+      }
+    }
+
+    items.push({
+      id: currentQ.id || crypto.randomUUID(),
+      type: 'mcq',
+      question: (currentQ.question || '').trim(),
+      options: filteredOptions,
+      correct_answer: resolvedAnswer || filteredOptions[0] || '',
+      marks: Number(currentQ.marks) || defaultMark,
+      image_url: currentQ.image_url,
+      image_caption: currentQ.image_caption,
+      section_header: currentQ.section_header || undefined,
+      section: currentQ.section_header || undefined,
+    });
+
+    currentQ = null;
     currentOptions = [];
-    currentAnswer = '';
-    currentMarks = defaultMark;
-    currentImageUrl = '';
-    currentImageCaption = '';
+    currentOptIndex = -1;
   };
 
-  /* ── Main Line-by-Line Tokenizer Engine ── */
-  for (let i = 0; i < rawLines.length; i++) {
-    const line = rawLines[i].trim();
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
     if (!line) continue;
 
-    // 1. Embedded Image detection
-    const imgMatch = line.match(IMAGE_MD_REGEX);
-    if (imgMatch) {
-      currentImageCaption = imgMatch[1];
-      currentImageUrl = imgMatch[2];
-      continue;
-    }
-
-    // 2. Marks detection: [0.5 marks] or Marks: 0.5
-    const marksMatch =
-      line.match(MARKS_REGEX) || line.match(MARKS_BRACKET_REGEX);
-    if (marksMatch) {
-      const val = parseFloat(marksMatch[1]);
-      if (!isNaN(val) && val > 0) {
-        currentMarks = val;
+    // 1. Detect section headers, dividers (---), or instructions
+    if (SECTION_DIVIDER_REGEX.test(line)) {
+      const cleanHeader = line.replace(/^[#\s\-*_=>]+/, '').trim();
+      if (cleanHeader) {
+        pendingSectionHeader = pendingSectionHeader
+          ? `${pendingSectionHeader} — ${cleanHeader}`
+          : cleanHeader;
       }
-      if (line.match(MARKS_REGEX)) continue; // skip standalone marks line
-    }
-
-    // 3. Answer line: "Answer: C"
-    const ansMatch = line.match(ANSWER_REGEX);
-    if (ansMatch) {
-      currentAnswer = ansMatch[1].trim();
+      currentOptIndex = -1; // Immediately end active option accumulation
       continue;
     }
 
-    // 4. Option line: "A. Option", "B) Option"
-    const optMatch = line.match(OPTION_REGEX);
-    if (optMatch) {
-      const optionText = optMatch[3].trim();
-      currentOptions.push(optionText);
+    // 2. Detect Question start (e.g., "1. What is...", "Question 9:")
+    const qMatch = line.match(QUESTION_START_REGEX);
+    if (qMatch) {
+      commitCurrentQuestion();
+
+      currentQ = {
+        id: crypto.randomUUID(),
+        question: qMatch[2].trim(),
+        marks: defaultMark,
+        section_header: pendingSectionHeader || undefined,
+      };
+      pendingSectionHeader = '';
+      currentOptions = [];
+      currentOptIndex = -1;
       continue;
     }
 
-    // 5. Explicit Section Header or Multi-lingual Directive
-    if (isExplicitSectionHeader(line) && currentOptions.length === 0) {
-      flushCurrentQuestion();
-      const cleanHeader = line.replace(/[*_#]/g, '').trim();
+    // 3. Detect Option choice (e.g., "A. London", "B) Paris", "(C) Rome")
+    const optMatch = line.match(OPTION_START_REGEX);
+    if (optMatch && currentQ) {
+      const letter = optMatch[1].toUpperCase();
+      const targetIdx = letter.charCodeAt(0) - 65;
 
-      const upper = cleanHeader.toUpperCase();
-      if (
-        upper.startsWith('SECTION') ||
-        upper.startsWith('PART') ||
-        upper.startsWith('IPIN') ||
-        upper.startsWith('ÌPÍN') ||
-        upper.startsWith('SASHE')
-      ) {
-        persistentSection = cleanHeader;
-        transientInstruction = '';
-      } else {
-        transientInstruction = cleanHeader;
+      const { text: cleanOpt, headerRemainder } = cleanOptionLine(optMatch[2]);
+
+      // Ensure array length
+      while (currentOptions.length < targetIdx) {
+        currentOptions.push('');
+      }
+      currentOptions[targetIdx] = cleanOpt;
+      currentOptIndex = targetIdx;
+
+      if (headerRemainder) {
+        pendingSectionHeader = pendingSectionHeader
+          ? `${pendingSectionHeader} — ${headerRemainder}`
+          : headerRemainder;
+        currentOptIndex = -1;
       }
       continue;
     }
 
-    // 6. Question Number Start (e.g. "1.", "12)", "Q1:")
-    const qStartMatch = line.match(QUESTION_START_REGEX);
-    if (qStartMatch) {
-      flushCurrentQuestion();
-      currentPromptLines.push(qStartMatch[1].trim());
+    // 4. Detect Explicit Answer line (e.g., "Answer: B", "Ans: Abuja")
+    const ansMatch = line.match(ANSWER_KEY_REGEX);
+    if (ansMatch && currentQ) {
+      currentQ.correct_answer = ansMatch[1].trim();
+      currentOptIndex = -1;
       continue;
     }
 
-    // 7. Markdown Tables & Figures
-    if (isTableLine(line)) {
-      currentPromptLines.push(line);
+    // 5. Detect Explicit Marks line (e.g., "Marks: 2", "Mark: 1.5")
+    const markMatch = line.match(MARKS_KEY_REGEX);
+    if (markMatch && currentQ) {
+      currentQ.marks = parseFloat(markMatch[1]) || defaultMark;
+      currentOptIndex = -1;
       continue;
     }
 
-    // 8. Context lines / Floating instructions / Multi-line continuations
-    if (currentOptions.length === 0) {
-      if (currentPromptLines.length === 0) {
-        // Line sits before any question number
-        transientInstruction = line.replace(/[*_#]/g, '').trim();
-      } else {
-        // Multi-line question prompt body
-        currentPromptLines.push(line);
+    // 6. Multiline Continuation handling
+    if (currentQ && currentOptIndex >= 0 && currentOptions[currentOptIndex] !== undefined) {
+      // Continuation of current option choice
+      const { text: cleanContinuation, headerRemainder } = cleanOptionLine(line);
+      currentOptions[currentOptIndex] = `${currentOptions[currentOptIndex]} ${cleanContinuation}`.trim();
+
+      if (headerRemainder) {
+        pendingSectionHeader = pendingSectionHeader
+          ? `${pendingSectionHeader} — ${headerRemainder}`
+          : headerRemainder;
+        currentOptIndex = -1;
       }
-    } else {
-      // Multi-line option continuation
-      if (currentOptions.length > 0) {
-        currentOptions[currentOptions.length - 1] += ` ${line}`;
-      }
+    } else if (currentQ && currentOptIndex === -1) {
+      // Continuation of question prompt
+      currentQ.question = `${currentQ.question || ''}\n${line}`.trim();
     }
   }
 
-  // Flush final pending question
-  flushCurrentQuestion();
+  // Commit last question
+  commitCurrentQuestion();
 
   return {
-    items: questions,
+    items,
     warnings,
-    skipped: 0,
+    errors,
   };
 }
 
 /**
- * Universal document text extractor (.txt, .docx fallback)
+ * Universal Bulk Theory Question Parser
+ */
+export function parseTheoryText(
+  rawText: string,
+  defaultMark: number = 10
+): ParseResult<ParsedQuestion> {
+  const lines = rawText.split(/\r?\n/);
+  const items: ParsedQuestion[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  let currentQ: Partial<ParsedQuestion> | null = null;
+  let pendingSectionHeader = '';
+
+  const commitTheory = () => {
+    if (!currentQ || !currentQ.question) return;
+
+    items.push({
+      id: currentQ.id || crypto.randomUUID(),
+      type: 'theory',
+      question: (currentQ.question || '').trim(),
+      options: [],
+      correct_answer: (currentQ.correct_answer || '').trim(),
+      marks: Number(currentQ.marks) || defaultMark,
+      image_url: currentQ.image_url,
+      image_caption: currentQ.image_caption,
+      section_header: currentQ.section_header || undefined,
+      section: currentQ.section_header || undefined,
+    });
+
+    currentQ = null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
+    if (!line) continue;
+
+    if (SECTION_DIVIDER_REGEX.test(line)) {
+      const cleanHeader = line.replace(/^[#\s\-*_=>]+/, '').trim();
+      if (cleanHeader) {
+        pendingSectionHeader = pendingSectionHeader
+          ? `${pendingSectionHeader} — ${cleanHeader}`
+          : cleanHeader;
+      }
+      continue;
+    }
+
+    const qMatch = line.match(QUESTION_START_REGEX);
+    if (qMatch) {
+      commitTheory();
+
+      currentQ = {
+        id: crypto.randomUUID(),
+        question: qMatch[2].trim(),
+        marks: defaultMark,
+        section_header: pendingSectionHeader || undefined,
+      };
+      pendingSectionHeader = '';
+      continue;
+    }
+
+    const markMatch = line.match(MARKS_KEY_REGEX);
+    if (markMatch && currentQ) {
+      currentQ.marks = parseFloat(markMatch[1]) || defaultMark;
+      continue;
+    }
+
+    const rubMatch = line.match(/^(?:Rubric|Guide|Model Answer|Answer)[\:\-\s]+(.+)$/i);
+    if (rubMatch && currentQ) {
+      currentQ.correct_answer = rubMatch[1].trim();
+      continue;
+    }
+
+    if (currentQ) {
+      currentQ.question = `${currentQ.question || ''}\n${line}`.trim();
+    }
+  }
+
+  commitTheory();
+
+  return {
+    items,
+    warnings,
+    errors,
+  };
+}
+
+/**
+ * Universal Document Text Extractor (.docx / .txt)
  */
 export async function parseDocument(file: File): Promise<string> {
-  return await file.text();
+  const extension = file.name.split('.').pop()?.toLowerCase();
+
+  if (extension === 'txt') {
+    return await file.text();
+  }
+
+  if (extension === 'docx') {
+    try {
+      const mammoth = await import('mammoth');
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    } catch (err) {
+      console.error('DOCX parsing error:', err);
+      throw new Error('Failed to read .docx file. You can paste the text directly into the bulk box.');
+    }
+  }
+
+  throw new Error('Unsupported file format. Please upload a .txt or .docx file.');
 }

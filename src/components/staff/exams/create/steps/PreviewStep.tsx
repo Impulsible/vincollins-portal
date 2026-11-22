@@ -5,9 +5,17 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import {
-  Clock, Eye, ChevronLeft, ChevronRight, Table,
-  Image as ImageIcon, BookOpen, Calculator,
-  Layers, Bookmark, Sparkles, HelpCircle, FileText
+  Clock,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Table,
+  Image as ImageIcon,
+  BookOpen,
+  Calculator,
+  Layers,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,8 +26,39 @@ import { cn } from "@/lib/utils";
 import { MARK_CONSTANTS } from "../constants";
 import { QuestionContent, hasTable } from "@/components/shared/QuestionContent";
 import type {
-  ExamDetails, Question, TheoryQuestion, TheorySubQuestion, MarkDistribution,
+  ExamDetails,
+  Question,
+  TheoryQuestion,
+  TheorySubQuestion,
+  MarkDistribution,
 } from "../types";
+
+/* ─── Helpers & Sanitizers ─── */
+
+function cleanOptionText(opt: string): { cleanText: string; leakedHeader?: string } {
+  if (!opt || typeof opt !== "string") return { cleanText: "" };
+
+  let text = opt;
+  let leakedHeader: string | undefined;
+
+  const delimiterMatch = text.match(/\s*(?:---|___|\*\*\*|===|##+|###+)\s*([\s\S]*?)$/i);
+  if (delimiterMatch && delimiterMatch.index !== undefined) {
+    const after = text.substring(delimiterMatch.index).replace(/^[#\s\-*_=>]+/, "").trim();
+    if (after) leakedHeader = after;
+    text = text.substring(0, delimiterMatch.index).trim();
+  }
+
+  const keywordMatch = text.match(
+    /\s+(?:SECTION\s+[A-Z0-9]|PART\s+[A-Z0-9]|OBJECTIVES?|INSTRUCTIONS?|CHOISISSEZ\b|CHOOSE\b)\s*([\s\S]*?)$/i
+  );
+  if (keywordMatch && keywordMatch.index !== undefined && keywordMatch.index > 0) {
+    const after = text.substring(keywordMatch.index).trim();
+    if (after && !leakedHeader) leakedHeader = after;
+    text = text.substring(0, keywordMatch.index).trim();
+  }
+
+  return { cleanText: text, leakedHeader };
+}
 
 interface PreviewStepProps {
   examDetails: ExamDetails;
@@ -105,7 +144,6 @@ export function PreviewStep({
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-950 transition-colors duration-300">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-4">
-
         {/* MARK SUMMARY DASHBOARD */}
         <div
           className={cn(
@@ -188,7 +226,7 @@ export function PreviewStep({
                     : "text-amber-600 dark:text-amber-400"
                 )}
               >
-                {totalMarks} / {EXAM_TOTAL}
+                {totalMarks.toFixed(1)} / {EXAM_TOTAL}
               </p>
             </div>
 
@@ -249,7 +287,10 @@ export function PreviewStep({
             {[
               { label: "Duration", value: `${examDetails.duration}m` },
               { label: "Pass Mark", value: `${examDetails.pass_mark}%` },
-              { label: "Term", value: examDetails.term.charAt(0).toUpperCase() + examDetails.term.slice(1) },
+              {
+                label: "Term",
+                value: examDetails.term.charAt(0).toUpperCase() + examDetails.term.slice(1),
+              },
               { label: "Session", value: examDetails.session_year },
             ].map(({ label, value }) => (
               <div
@@ -297,9 +338,18 @@ export function PreviewStep({
   );
 }
 
-type PreviewQuestion =
-  | (Question & { _type: "objective"; section_header?: string })
-  | (TheoryQuestion & { _type: "theory"; section_header?: string });
+type PreviewQuestion = {
+  id: string;
+  _type: "objective" | "theory";
+  question: string;
+  options?: string[];
+  correct_answer?: string;
+  marks?: number;
+  image_url?: string;
+  image_caption?: string;
+  section_header?: string;
+  sub_questions?: TheorySubQuestion[];
+};
 
 function CBTPreview({
   examDetails,
@@ -319,23 +369,57 @@ function CBTPreview({
   const [timeLeft, setTimeLeft] = useState(examDetails.duration * 60);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const allQuestions = useMemo<PreviewQuestion[]>(
-    () => [
-      ...questions.map((q) => ({ 
-        ...q, 
-        _type: "objective" as const,
-        section_header: (q as any).section_header || (q as any).section || undefined
-      })),
-      ...(hasTheory
-        ? theoryQuestions.map((q) => ({ 
-            ...q, 
-            _type: "theory" as const,
-            section_header: (q as any).section_header || (q as any).section || undefined
-          }))
-        : []),
-    ],
-    [questions, theoryQuestions, hasTheory]
-  );
+  // Normalize questions and sanitize options
+  const allQuestions = useMemo<PreviewQuestion[]>(() => {
+    let carryOverHeader = "";
+
+    const objItems: PreviewQuestion[] = questions.map((q) => {
+      let qSectionHeader =
+        (q as any).section_header || (q as any).section || carryOverHeader || undefined;
+      carryOverHeader = "";
+
+      const rawOptions = Array.isArray(q.options) ? q.options : [];
+      const cleanOptions: string[] = [];
+
+      for (const opt of rawOptions) {
+        const { cleanText, leakedHeader } = cleanOptionText(opt);
+        cleanOptions.push(cleanText);
+        if (leakedHeader) {
+          carryOverHeader = carryOverHeader
+            ? `${carryOverHeader} — ${leakedHeader}`
+            : leakedHeader;
+        }
+      }
+
+      return {
+        id: q.id,
+        _type: "objective",
+        question: q.question,
+        options: cleanOptions,
+        correct_answer: q.correct_answer,
+        marks: q.marks,
+        image_url: q.image_url,
+        image_caption: q.image_caption,
+        section_header: qSectionHeader,
+      };
+    });
+
+    const theoryItems: PreviewQuestion[] = hasTheory
+      ? theoryQuestions.map((q) => ({
+          id: q.id,
+          _type: "theory",
+          question: q.question,
+          marks: q.marks,
+          image_url: q.image_url,
+          image_caption: q.image_caption,
+          sub_questions: q.sub_questions,
+          section_header:
+            (q as any).section_header || (q as any).section || carryOverHeader || undefined,
+        }))
+      : [];
+
+    return [...objItems, ...theoryItems];
+  }, [questions, theoryQuestions, hasTheory]);
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -420,15 +504,19 @@ function CBTPreview({
                     ? "bg-emerald-500 dark:bg-emerald-600 text-white"
                     : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
                 )}
-                title={`Question ${idx + 1}${q.section_header ? ` - [${q.section_header}]` : ""}${hasTableIndicator ? " (Contains Table)" : ""}${hasDiagramIndicator ? " (Contains Diagram)" : ""}`}
+                title={`Question ${idx + 1}${
+                  q.section_header ? ` - [${q.section_header}]` : ""
+                }${hasTableIndicator ? " (Contains Table)" : ""}${
+                  hasDiagramIndicator ? " (Contains Diagram)" : ""
+                }`}
               >
                 {idx + 1}
                 {(hasTableIndicator || hasDiagramIndicator || hasSectionIndicator) && (
-                  <span 
+                  <span
                     className={cn(
                       "absolute -top-1 -right-1 w-2 h-2 rounded-full",
                       hasSectionIndicator ? "bg-amber-500" : "bg-blue-500"
-                    )} 
+                    )}
                   />
                 )}
               </button>
@@ -440,8 +528,7 @@ function CBTPreview({
       {/* QUESTION BODY */}
       {current && (
         <div className="p-3 sm:p-5 space-y-4">
-          
-          {/* SECTION HEADER / INSTRUCTION CALLOUT BANNER (FROM OBJECTIVE PARSER) */}
+          {/* SECTION HEADER / INSTRUCTION BANNER */}
           {sectionHeader && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-50 via-indigo-50/60 to-transparent dark:from-purple-950/40 dark:via-indigo-950/20 dark:to-transparent border-l-4 border-purple-600 dark:border-purple-400 border-y border-r dark:border-purple-900/40 text-purple-900 dark:text-purple-200 shadow-2xs">
               <Layers className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
@@ -479,23 +566,31 @@ function CBTPreview({
                   </Badge>
                 )}
                 <Badge className="text-[10px] bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-0">
-                  {current.marks || defaultMark || 0.5} {current.marks === 1 ? "mark" : "marks"}
+                  {current.marks || defaultMark || 0.5}{" "}
+                  {current.marks === 1 ? "mark" : "marks"}
                 </Badge>
               </div>
             </div>
 
-            {/* UNIFIED QUESTION CONTENT (TEXT, BEAUTIFULLY STYLED TABLES & DIAGRAMS) */}
+            {/* UNIFIED QUESTION CONTENT */}
             <QuestionContent
               text={current.question}
               imageUrl={current.image_url}
-              imageCaption={current._type === "theory" ? current.image_caption : undefined}
+              imageCaption={current.image_caption}
               className="text-xs sm:text-sm"
             />
           </div>
 
-          {/* OBJECTIVE: DYNAMIC MCQ OPTIONS (A-D, A-E, A-F, ETC.) */}
+          {/* OBJECTIVE: DYNAMIC MCQ OPTIONS (A through H) */}
           {current._type === "objective" && current.options && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <div
+              className={cn(
+                "grid gap-2 pt-1",
+                current.options.length <= 4
+                  ? "grid-cols-1 sm:grid-cols-2"
+                  : "grid-cols-1"
+              )}
+            >
               {current.options.map((opt, idx) => {
                 const isSelected = answers[current.id] === opt;
                 return (
@@ -527,7 +622,7 @@ function CBTPreview({
                         setAnswers((prev) => ({ ...prev, [current.id]: opt }))
                       }
                     />
-                    <span className="text-xs sm:text-sm">{opt}</span>
+                    <span className="text-xs sm:text-sm flex-1">{opt}</span>
                   </label>
                 );
               })}

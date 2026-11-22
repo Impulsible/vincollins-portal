@@ -19,6 +19,9 @@ import {
   Eye,
   ShieldAlert,
   UploadCloud,
+  PlusCircle,
+  MinusCircle,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,9 +50,9 @@ import {
   type ParsedQuestion,
 } from '@/hooks/useQuestionParser';
 import { OBJECTIVE_TEMPLATE } from '../constants';
-import type { Question, ParseResult } from '../types';
+import type { Question, ParseResult, MarkDistribution } from '../types';
 
-/* ─── Helpers ─── */
+/* ─── Helpers & Sanitizers ─── */
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -101,25 +104,57 @@ const uploadImage = async (
   }
 };
 
+/**
+ * Strips leaked dividers (---), markdown headings (##, ###), and instruction
+ * keywords from option text so they don't corrupt choices like Option D.
+ *
+ * NOTE: uses [\s\S] instead of the `s` (dotAll) flag so this compiles
+ * under any TS target (the `s` flag requires es2018+).
+ */
+function sanitizeOptionText(opt: string): {
+  cleanText: string;
+  leakedHeader?: string;
+} {
+  if (!opt || typeof opt !== 'string') return { cleanText: '' };
+
+  let text = opt;
+  let leakedHeader: string | undefined;
+
+  // Match embedded markdown dividers or headers
+  // (e.g. "Olo --- ## OBJECTIVES ### Choisissez la bonne réponse")
+  const delimiterMatch = text.match(
+    /\s*(?:---|___|\*\*\*|===|##+|###+)\s*([\s\S]*?)$/i
+  );
+  if (delimiterMatch && delimiterMatch.index !== undefined) {
+    const after = text
+      .substring(delimiterMatch.index)
+      .replace(/^[#\s\-*_=>]+/, '')
+      .trim();
+    if (after) leakedHeader = after;
+    text = text.substring(0, delimiterMatch.index).trim();
+  }
+
+  // Match inline section headers or instructions
+  const keywordMatch = text.match(
+    /\s+(?:SECTION\s+[A-Z0-9]|PART\s+[A-Z0-9]|OBJECTIVES?|INSTRUCTIONS?|CHOISISSEZ\b|CHOOSE\b)\s*([\s\S]*?)$/i
+  );
+  if (
+    keywordMatch &&
+    keywordMatch.index !== undefined &&
+    keywordMatch.index > 0
+  ) {
+    const after = text.substring(keywordMatch.index).trim();
+    if (after && !leakedHeader) leakedHeader = after;
+    text = text.substring(0, keywordMatch.index).trim();
+  }
+
+  return { cleanText: text, leakedHeader };
+}
+
 const EXAM_TOTAL = 60;
 const MARK_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 5] as const;
 
 /* ─── Types ─── */
-
-interface MarkDistribution {
-  objectiveTotal: number;
-  theoryTotal: number;
-  examTotal: number;
-  ca1Max: number;
-  ca2Max: number;
-  caTotal: number;
-  grandTotal: number;
-  questionCount: number;
-  theoryQuestionCount: number;
-  marksPerTheoryQuestion: number;
-  isBalanced: boolean;
-  theoryMarksPerQuestion: number;
-}
 
 interface ObjectiveQuestionsStepProps {
   questions: Question[];
@@ -158,7 +193,9 @@ export function ObjectiveQuestionsStep({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
+  // Manual composer state with dynamic options (default 4 options A-D)
   const [manualQ, setManualQ] = useState({
+    section_header: '',
     question: '',
     options: ['', '', '', ''],
     correct_answer: '',
@@ -288,7 +325,7 @@ export function ObjectiveQuestionsStep({
     }
     setParseError(null);
 
-    // Call authoritative universal parser
+    // Call universal parser
     const result = parseObjectiveText(bulkText, defaultMark);
 
     if (result.warnings.length > 0) {
@@ -297,7 +334,7 @@ export function ObjectiveQuestionsStep({
 
     if (result.items.length === 0) {
       setParseError(
-        'No valid questions found. Ensure format has questions, options (A-D), and Answers.'
+        'No valid questions found. Ensure format has questions, options (A-D or A-F), and Answers.'
       );
       return;
     }
@@ -312,17 +349,55 @@ export function ObjectiveQuestionsStep({
       );
     }
 
-    // Convert parsed items to full Question structure
-    const convertedItems: Question[] = result.items.map((item) => ({
-      id: item.id,
-      type: 'mcq',
-      question: item.question,
-      options: item.options,
-      correct_answer: item.correct_answer,
-      marks: item.marks,
-      image_url: item.image_url,
-      image_caption: item.image_caption,
-    }));
+    // Sanitize options and capture leaked headers
+    let carryOverHeader = '';
+    const convertedItems: Question[] = result.items.map((item) => {
+      let qSectionHeader =
+        (item as any).section_header ||
+        (item as any).section ||
+        carryOverHeader ||
+        undefined;
+      carryOverHeader = '';
+
+      const sanitizedOptions: string[] = [];
+      const rawOptions = Array.isArray(item.options) ? item.options : [];
+
+      for (const opt of rawOptions) {
+        const { cleanText, leakedHeader } = sanitizeOptionText(opt);
+        sanitizedOptions.push(cleanText);
+        if (leakedHeader) {
+          carryOverHeader = carryOverHeader
+            ? `${carryOverHeader} — ${leakedHeader}`
+            : leakedHeader;
+        }
+      }
+
+      // Re-map correct answer if needed
+      let cleanCorrect = item.correct_answer;
+      if (cleanCorrect) {
+        const matched = sanitizedOptions.find(
+          (o, i) => rawOptions[i] === cleanCorrect || o === cleanCorrect
+        );
+        if (matched) {
+          cleanCorrect = matched;
+        } else {
+          cleanCorrect = sanitizeOptionText(cleanCorrect).cleanText;
+        }
+      }
+
+      return {
+        id: item.id || crypto.randomUUID(),
+        type: 'mcq',
+        question: item.question.trim(),
+        options: sanitizedOptions,
+        correct_answer: cleanCorrect,
+        marks: Number(item.marks) || defaultMark,
+        image_url: item.image_url || undefined,
+        image_caption: item.image_caption || undefined,
+        section_header: qSectionHeader,
+        section: qSectionHeader,
+      };
+    });
 
     onQuestionsChange([...questions, ...convertedItems]);
     onBulkTextChange('');
@@ -349,16 +424,53 @@ export function ObjectiveQuestionsStep({
         const result = parseObjectiveText(text, defaultMark);
 
         if (result.items.length > 0) {
-          const convertedItems: Question[] = result.items.map((item) => ({
-            id: item.id,
-            type: 'mcq',
-            question: item.question,
-            options: item.options,
-            correct_answer: item.correct_answer,
-            marks: item.marks,
-            image_url: item.image_url,
-            image_caption: item.image_caption,
-          }));
+          let carryOverHeader = '';
+          const convertedItems: Question[] = result.items.map((item) => {
+            let qSectionHeader =
+              (item as any).section_header ||
+              (item as any).section ||
+              carryOverHeader ||
+              undefined;
+            carryOverHeader = '';
+
+            const sanitizedOptions: string[] = [];
+            const rawOptions = Array.isArray(item.options) ? item.options : [];
+
+            for (const opt of rawOptions) {
+              const { cleanText, leakedHeader } = sanitizeOptionText(opt);
+              sanitizedOptions.push(cleanText);
+              if (leakedHeader) {
+                carryOverHeader = carryOverHeader
+                  ? `${carryOverHeader} — ${leakedHeader}`
+                  : leakedHeader;
+              }
+            }
+
+            let cleanCorrect = item.correct_answer;
+            if (cleanCorrect) {
+              const matched = sanitizedOptions.find(
+                (o, i) => rawOptions[i] === cleanCorrect || o === cleanCorrect
+              );
+              if (matched) {
+                cleanCorrect = matched;
+              } else {
+                cleanCorrect = sanitizeOptionText(cleanCorrect).cleanText;
+              }
+            }
+
+            return {
+              id: item.id || crypto.randomUUID(),
+              type: 'mcq',
+              question: item.question.trim(),
+              options: sanitizedOptions,
+              correct_answer: cleanCorrect,
+              marks: Number(item.marks) || defaultMark,
+              image_url: item.image_url || undefined,
+              image_caption: item.image_caption || undefined,
+              section_header: qSectionHeader,
+              section: qSectionHeader,
+            };
+          });
 
           onQuestionsChange([...questions, ...convertedItems]);
           if (result.warnings.length > 0) {
@@ -383,6 +495,30 @@ export function ObjectiveQuestionsStep({
     [questions, onQuestionsChange, defaultMark]
   );
 
+  /* ── Dynamic Option Modifiers for Manual Composer ── */
+  const handleAddManualOption = () => {
+    if (manualQ.options.length >= 8) {
+      toast.info('Maximum 8 options supported per question');
+      return;
+    }
+    setManualQ((p) => ({ ...p, options: [...p.options, ''] }));
+  };
+
+  const handleRemoveManualOption = (indexToRemove: number) => {
+    if (manualQ.options.length <= 2) {
+      toast.warning('A multiple-choice question requires at least 2 options');
+      return;
+    }
+    const removedValue = manualQ.options[indexToRemove];
+    const newOptions = manualQ.options.filter((_, idx) => idx !== indexToRemove);
+
+    setManualQ((p) => ({
+      ...p,
+      options: newOptions,
+      correct_answer: p.correct_answer === removedValue ? '' : p.correct_answer,
+    }));
+  };
+
   const handleAddManual = useCallback(() => {
     if (!manualQ.question.trim()) {
       toast.error('Question text is required');
@@ -394,25 +530,34 @@ export function ObjectiveQuestionsStep({
     }
     const filledOptions = manualQ.options.filter((o) => o.trim());
     if (filledOptions.length < 2) {
-      toast.error('Add at least 2 options');
+      toast.error('Add at least 2 valid option choices');
       return;
     }
 
-    onQuestionsChange([
-      ...questions,
-      {
-        id: crypto.randomUUID(),
-        type: 'mcq',
-        question: manualQ.question.trim(),
-        options: manualQ.options,
-        correct_answer: manualQ.correct_answer,
-        marks: defaultMark,
-        image_url: manualQ.image_url || undefined,
-        image_caption: manualQ.image_caption || undefined,
-      },
-    ]);
+    // Clean options before committing
+    const cleanOptions = manualQ.options
+      .map((o) => sanitizeOptionText(o).cleanText)
+      .filter((o) => o.trim());
+
+    // `satisfies Question` keeps full type-checking on the literal while
+    // allowing section_header / section (declared optional on Question).
+    const newQuestion = {
+      id: crypto.randomUUID(),
+      type: 'mcq' as const,
+      question: manualQ.question.trim(),
+      options: cleanOptions,
+      correct_answer: manualQ.correct_answer.trim(),
+      marks: defaultMark,
+      image_url: manualQ.image_url || undefined,
+      image_caption: manualQ.image_caption || undefined,
+      section_header: manualQ.section_header.trim() || undefined,
+      section: manualQ.section_header.trim() || undefined,
+    } satisfies Question;
+
+    onQuestionsChange([...questions, newQuestion]);
 
     setManualQ({
+      section_header: '',
       question: '',
       options: ['', '', '', ''],
       correct_answer: '',
@@ -587,8 +732,7 @@ export function ObjectiveQuestionsStep({
                   Mark Per Question
                 </Label>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Select standard value or auto-balance across all objective
-                  items
+                  Select standard value or auto-balance across all objective items
                 </p>
               </div>
             </div>
@@ -640,8 +784,7 @@ export function ObjectiveQuestionsStep({
               {!isOver && !isBalanced && roomForMoreQuestions > 0 && (
                 <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
                   <Zap className="h-3 w-3" />
-                  Room for {roomForMoreQuestions} more questions at {defaultMark}{' '}
-                  mk
+                  Room for {roomForMoreQuestions} more questions at {defaultMark} mk
                 </span>
               )}
             </div>
@@ -774,13 +917,29 @@ export function ObjectiveQuestionsStep({
                     Compose Objective Question
                   </Label>
                   <p className="text-[11px] text-slate-400">
-                    Supports tables, diagrams, screenshots, and 4 option choices
+                    Supports tables, diagrams, screenshots, sections, and 2 to 8 choices
                   </p>
                 </div>
               </div>
               <Badge className="text-xs bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-0">
                 {defaultMark} Marks
               </Badge>
+            </div>
+
+            {/* Optional Section Sub-header */}
+            <div>
+              <Label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Layers className="h-3 w-3 text-amber-500" /> Section Header / Instruction (Optional)
+              </Label>
+              <Input
+                type="text"
+                placeholder="e.g. SECTION A — Choose the nearest in meaning / SECTION B"
+                value={manualQ.section_header}
+                onChange={(e) =>
+                  setManualQ((p) => ({ ...p, section_header: e.target.value }))
+                }
+                className="mt-1 h-8 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
             </div>
 
             <div>
@@ -912,20 +1071,32 @@ export function ObjectiveQuestionsStep({
               )}
             </div>
 
+            {/* Dynamic Options Section */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                  Options Choices (Click letter pill to mark as correct answer)
+                  Options Choices ({manualQ.options.length} options — click letter to mark correct)
                 </Label>
-                {manualHasRelative && (
-                  <Badge
+                <div className="flex items-center gap-2">
+                  {manualHasRelative && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] h-4 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+                    >
+                      <ShieldAlert className="h-2.5 w-2.5 mr-1" /> Shuffle locked
+                    </Badge>
+                  )}
+                  <Button
+                    type="button"
                     variant="outline"
-                    className="text-[9px] h-4 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400"
+                    size="sm"
+                    onClick={handleAddManualOption}
+                    disabled={manualQ.options.length >= 8}
+                    className="h-6 text-[10px] px-2 text-blue-600 border-blue-200 dark:border-blue-800"
                   >
-                    <ShieldAlert className="h-2.5 w-2.5 mr-1" /> Option shuffle
-                    locked for this item
-                  </Badge>
-                )}
+                    <PlusCircle className="h-3 w-3 mr-1" /> Add Choice
+                  </Button>
+                </div>
               </div>
 
               {manualQ.options.map((opt, idx) => {
@@ -974,12 +1145,25 @@ export function ObjectiveQuestionsStep({
                         }));
                       }}
                       className={cn(
-                        'h-9 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200',
+                        'h-9 text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 flex-1',
                         isCorrect &&
                           'border-emerald-400 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20'
                       )}
                       placeholder={`Option ${letter}`}
                     />
+
+                    {manualQ.options.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveManualOption(idx)}
+                        className="h-9 w-9 p-0 text-slate-400 hover:text-rose-500"
+                        title="Remove option choice"
+                      >
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
@@ -1074,7 +1258,7 @@ export function ObjectiveQuestionsStep({
             <div className="max-h-[360px] sm:max-h-[440px] overflow-y-auto space-y-2 pr-1">
               {questions.map((q, i) => (
                 <ObjectiveCard
-                  key={q.id}
+                  key={q.id || i}
                   question={q}
                   index={i}
                   onDelete={(id) =>

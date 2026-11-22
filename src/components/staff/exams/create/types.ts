@@ -34,6 +34,10 @@ export interface Question {
   image_caption?: string;
   /** optional per-question explanation shown after grading */
   explanation?: string;
+  /** optional instruction / section banner shown above this question */
+  section_header?: string;
+  /** alias of section_header kept for backward-compatibility with parser output */
+  section?: string;
 }
 
 export interface TheorySubQuestion {
