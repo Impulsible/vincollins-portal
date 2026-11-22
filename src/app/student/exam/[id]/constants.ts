@@ -206,27 +206,64 @@ export type TerminalStatus = (typeof TERMINAL_STATUSES)[number]
 // ============================================
 
 /**
+ * Normalizes text by stripping diacritical marks/accents:
+ * "Français" -> "Francais"
+ * "Yorùbá"   -> "Yoruba"
+ * "Èdè"      -> "Ede"
+ * "Ásụ̀sụ̀"   -> "Asusu"
+ */
+export function stripDiacritics(str: string): string {
+  if (!str) return ''
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+/**
  * TIER 1: STRICT SUBJECT EXCLUSION LIST
  * Subjects containing reading passages, comprehension blocks, oral tests,
  * or narrative sequences where question and option order must remain
  * 100% IDENTICAL across all students.
  */
 export const SHUFFLE_EXCLUDED_SUBJECTS: string[] = [
-  // Languages
+  // English & Literature
   'english',
   'english language',
   'english studies',
   'use of english',
+  'general english',
   'literature',
   'literature in english',
   'literature-in-english',
   'oral english',
+
+  // French (Français) & Foreign Languages
   'french',
+  'francais',
+  'french language',
+  'langue francaise',
+  'french studies',
+  'etudes francaises',
+
+  // Nigerian Languages (Yoruba, Igbo, Hausa)
   'yoruba',
+  'ede yoruba',
+  'ede',
+  'yoruba language',
+  'yoruba studies',
   'igbo',
+  'asusu igbo',
+  'igbo language',
+  'igbo studies',
   'hausa',
+  'harshen hausa',
+  'hausa language',
+  'hausa studies',
+
+  // Other Languages
   'arabic',
+  'arabic language',
+  'arabic studies',
   'german',
+  'german language',
 
   // Aptitude & Reasoning
   'verbal reasoning',
@@ -238,11 +275,12 @@ export const SHUFFLE_EXCLUDED_SUBJECTS: string[] = [
 ]
 
 /**
- * TIER 2: RELATIVE OPTION PHRASES
- * If an individual question (in any subject, e.g. Maths, Biology) contains
- * relative positional phrases, its options (A, B, C, D) are locked in order.
+ * TIER 2: RELATIVE OPTION PHRASES (English & French)
+ * If an individual question (in any subject) contains relative positional phrases,
+ * its options (A, B, C, D) are locked in order.
  */
 export const RELATIVE_OPTION_PHRASES: string[] = [
+  // English Relative Phrases
   'all of the above',
   'none of the above',
   'both a and b',
@@ -257,6 +295,23 @@ export const RELATIVE_OPTION_PHRASES: string[] = [
   'all of these',
   'all the above',
   'none of the options',
+
+  // French Relative Phrases (Normalised without accents)
+  'toutes les reponses ci-dessus',
+  'toutes les reponses ci dessus',
+  'toutes les propositions ci-dessus',
+  'toutes les options ci-dessus',
+  'tous les elements ci-dessus',
+  'aucune des reponses ci-dessus',
+  'aucune des reponses',
+  'aucune de ces reponses',
+  'aucune des options',
+  'aucun des elements ci-dessus',
+  'les deux a et b',
+  'a et b seulement',
+  'b et c seulement',
+  'a et c seulement',
+  'ni a ni b',
 ]
 
 // ============================================
@@ -283,17 +338,27 @@ export function isPassingWAECGrade(grade: string): boolean {
 
 /**
  * Checks if a subject is in the excluded list (Languages, Verbal Reasoning, Comprehension).
+ * Automatically normalizes diacritics/accents like "Français", "Yorùbá", "Èdè", "Ásụ̀sụ̀ Ị̀gbò".
  */
 export function isSubjectExcludedFromShuffle(subjectName?: string | null): boolean {
   if (!subjectName) return false
-  const normalized = subjectName
+
+  // 1. Strip all accents (Français -> Francais, Yorùbá -> Yoruba)
+  const stripped = stripDiacritics(subjectName)
+
+  // 2. Clean punctuation and whitespace
+  const normalized = stripped
     .trim()
     .toLowerCase()
-    .replace(/[._]/g, ' ')
+    .replace(/[._\-\/]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
 
+  if (!normalized) return false
+
+  // 3. Match against the excluded subjects list
   return SHUFFLE_EXCLUDED_SUBJECTS.some((excluded) => {
-    const cleanExcluded = excluded.toLowerCase()
+    const cleanExcluded = stripDiacritics(excluded).toLowerCase().trim()
     return (
       normalized === cleanExcluded ||
       normalized.startsWith(`${cleanExcluded} `) ||
@@ -305,12 +370,17 @@ export function isSubjectExcludedFromShuffle(subjectName?: string | null): boole
 }
 
 /**
- * Checks if options contain directional/relative phrases (e.g. "All of the above").
+ * Checks if options contain directional/relative phrases in English or French.
  */
-export function hasRelativeOptions(options: string[]): boolean {
+export function hasRelativeOptions(options?: string[] | null): boolean {
   if (!Array.isArray(options) || options.length === 0) return false
   return options.some((opt) => {
-    const text = String(opt || "").trim().toLowerCase()
+    const text = stripDiacritics(String(opt || ''))
+      .trim()
+      .toLowerCase()
+      .replace(/[._\-\/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      
     return RELATIVE_OPTION_PHRASES.some((phrase) => text.includes(phrase))
   })
 }
@@ -341,7 +411,7 @@ export function shouldShuffleOptions(
     return false
   }
 
-  // 2. Relative phrase lock ("All of the above", "None of the above")
+  // 2. Relative phrase lock ("All of the above", "Toutes les réponses ci-dessus")
   if (hasRelativeOptions(options)) {
     return false
   }

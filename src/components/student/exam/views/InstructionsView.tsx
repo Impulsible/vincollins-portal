@@ -4,9 +4,8 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import {
-  BookOpen, User, Clock, Calendar, Camera,
+  BookOpen, User, Clock, Calendar,
   FileText, Shield, Lock, Loader2, Award,
   Target, AlertCircle, CheckCircle2, ArrowLeft,
   MonitorPlay, Wifi, Eye, PenTool, CheckSquare,
@@ -16,7 +15,7 @@ import {
 import Image from 'next/image'
 import { TERM_NAMES, TAB_SWITCH_LIMIT, FULLSCREEN_EXIT_LIMIT } from '@/app/student/exam/[id]/constants'
 import type { Exam, Question } from '@/app/student/exam/[id]/types'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
@@ -66,42 +65,80 @@ export function InstructionsView({
 }: InstructionsViewProps) {
   const [agreedToRules, setAgreedToRules] = useState(false)
 
-  const examTitle = safeString(exam?.title, 'Exam')
+  const examTitle = safeString(exam?.title, 'Assessment')
   const examSubject = safeString(exam?.subject, '—')
   const examClass = safeString(exam?.class, '')
-  const examDuration = safeNumber(exam?.duration, 30)
-  const examPassingPct = safeNumber(exam?.passing_percentage, 50)
+  const examDuration = safeNumber(exam?.duration ?? (exam as any)?.duration_minutes, 60)
+  const examPassingPct = safeNumber((exam as any)?.passing_percentage ?? exam?.passing_score, 50)
   const examInstructions = safeString(exam?.instructions, '')
-  const examTermRaw = safeString(exam?.term, '')
-  const examSession = safeString(exam?.session_year, 'Current Session')
+  const examTermRaw = safeString((exam as any)?.term, '')
+  const examSession = safeString((exam as any)?.session_year ?? (exam as any)?.session, 'Current Session')
 
-  const objectiveQuestions = allQuestions.filter(q => q.type !== 'theory')
-  const theoryQuestions = allQuestions.filter(q => q.type === 'theory')
+  // 1. DYNAMIC QUESTIONS & MARKS CALCULATION
+  const objectiveQuestions = useMemo(() => allQuestions.filter(q => q.type !== 'theory'), [allQuestions])
+  const theoryQuestions = useMemo(() => allQuestions.filter(q => q.type === 'theory'), [allQuestions])
 
-  const objectivePoints = objectiveQuestions.reduce(
-    (sum, q) => sum + Number(q.points || 1),
-    0,
-  )
-  const theoryPoints = theoryQuestions.reduce(
-    (sum, q) => sum + Number(q.points || 1),
-    0,
-  )
-  const totalPoints = objectivePoints + theoryPoints
+  const hasTheory = theoryQuestions.length > 0
 
-  const objectivePct = totalPoints > 0 ? Math.round((objectivePoints / totalPoints) * 100) : 0
-  const theoryPct = totalPoints > 0 ? Math.round((theoryPoints / totalPoints) * 100) : 0
+  // Derive marks respecting both `marks` and `points` properties
+  const objectivePoints = useMemo(() => {
+    if ((exam as any)?.objective_marks != null && Number((exam as any).objective_marks) > 0) {
+      return Number((exam as any).objective_marks)
+    }
+    return objectiveQuestions.reduce(
+      (sum, q) => sum + Number((q as any).marks ?? (q as any).points ?? 1),
+      0
+    )
+  }, [exam, objectiveQuestions])
+
+  const requiredTheoryCount = (exam as any)?.required_theory_count ?? (exam as any)?.theory_answer_count ?? theoryQuestions.length
+
+  const theoryPoints = useMemo(() => {
+    if (!hasTheory) return 0
+    if ((exam as any)?.theory_marks != null && Number((exam as any).theory_marks) > 0) {
+      return Number((exam as any).theory_marks)
+    }
+    
+    // If student answers N of M, score the per-question mark multiplied by required count
+    if (theoryQuestions.length > 0 && requiredTheoryCount < theoryQuestions.length) {
+      const perQuestionMark = Number((theoryQuestions[0] as any)?.marks ?? (theoryQuestions[0] as any)?.points ?? 10)
+      return perQuestionMark * requiredTheoryCount
+    }
+
+    return theoryQuestions.reduce(
+      (sum, q) => sum + Number((q as any).marks ?? (q as any).points ?? 10),
+      0
+    )
+  }, [exam, hasTheory, theoryQuestions, requiredTheoryCount])
+
+  const totalPoints = useMemo(() => {
+    if ((exam as any)?.total_marks != null && Number((exam as any).total_marks) > 0) {
+      return Number((exam as any).total_marks)
+    }
+    return Number((objectivePoints + theoryPoints).toFixed(2))
+  }, [exam, objectivePoints, theoryPoints])
+
+  // 2. MATHEMATICAL 100% PERCENTAGE GUARANTEE (Fixes 101% bug)
+  const { objectivePct, theoryPct } = useMemo(() => {
+    if (totalPoints <= 0) return { objectivePct: 100, theoryPct: 0 }
+    if (!hasTheory) return { objectivePct: 100, theoryPct: 0 }
+    
+    const rawObj = (objectivePoints / totalPoints) * 100
+    const objPct = Math.round(rawObj)
+    const thPct = Math.max(0, 100 - objPct) // Forces exact 100% sum
+    return { objectivePct: objPct, theoryPct: thPct }
+  }, [totalPoints, objectivePoints, hasTheory])
 
   const termLabel = examTermRaw
     ? (TERM_NAMES[examTermRaw as keyof typeof TERM_NAMES] ?? examTermRaw)
     : 'Current Term'
 
   const sessionLabel = examSession
-  const hasTheory = theoryQuestions.length > 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* 🎨 TOP BAR                                                      */}
+      {/* 🎨 TOP BAR                                                     */}
       {/* ═══════════════════════════════════════════════════════════════ */}
       <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5">
@@ -130,8 +167,8 @@ export function InstructionsView({
                 </div>
               </div>
             </div>
-            <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-600 dark:to-teal-600 text-white border-0 shadow-md shadow-emerald-200 dark:shadow-emerald-950/50 px-3 py-1 shrink-0">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
+            <Badge className="bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-600 dark:to-teal-600 text-white border-0 shadow-md shadow-emerald-200 dark:shadow-emerald-950/50 px-3 py-1 shrink-0 font-semibold">
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
               Ready to Start
             </Badge>
           </div>
@@ -142,7 +179,7 @@ export function InstructionsView({
         <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
           
           {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 👤 LEFT COLUMN — CANDIDATE                                   */}
+          {/* 👤 LEFT COLUMN — CANDIDATE                                  */}
           {/* ═══════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-2">
             <div className="lg:sticky lg:top-24 space-y-4">
@@ -187,21 +224,21 @@ export function InstructionsView({
                       )}
                       
                       <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                        <Badge className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-800 dark:to-slate-600 text-white text-[10px] font-bold px-3 py-1 shadow-xl border border-white/20 tracking-wider">
+                        <Badge className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-800 dark:to-slate-600 text-white text-[10px] font-bold px-3 py-1 shadow-xl border border-white/20 tracking-wider font-mono">
                           <Hash className="h-2.5 w-2.5 mr-1" />
-                          {profile?.vin_id || 'STUDENT'}
+                          {profile?.vin_id || 'VIN-STD-0000'}
                         </Badge>
                       </div>
                     </div>
 
                     <div className="mt-3 text-center space-y-0.5 w-full">
                       <h3 className="text-slate-900 dark:text-slate-100 font-bold text-base leading-tight">
-                        {profile?.full_name || 'Student'}
+                        {profile?.full_name || 'Student Candidate'}
                       </h3>
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5 pt-0.5">
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full">
                           <GraduationCap className="h-2.5 w-2.5" />
-                          {profile?.class ?? '—'}
+                          {profile?.class ?? examClass ?? '—'}
                         </span>
                       </div>
                       <p className="text-slate-400 dark:text-slate-500 text-[11px] truncate pt-1">{profile?.email}</p>
@@ -244,7 +281,7 @@ export function InstructionsView({
           </div>
 
           {/* ═══════════════════════════════════════════════════════════ */}
-          {/* 📄 RIGHT COLUMN — MAIN CONTENT                               */}
+          {/* 📄 RIGHT COLUMN — MAIN CONTENT                              */}
           {/* ═══════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-5 space-y-4">
             
@@ -292,8 +329,8 @@ export function InstructionsView({
                     <TrendingUp className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     Question Distribution
                   </h3>
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                    {totalPoints} total marks
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest font-mono">
+                    {totalPoints} TOTAL MARKS
                   </span>
                 </div>
                 
@@ -367,6 +404,11 @@ export function InstructionsView({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-purple-900 dark:text-purple-200">
                               {theoryQuestions.length} Theory
+                              {requiredTheoryCount < theoryQuestions.length && (
+                                <span className="text-xs font-normal text-purple-600 dark:text-purple-300 ml-1">
+                                  (Answer any {requiredTheoryCount})
+                                </span>
+                              )}
                             </p>
                             <p className="text-xs text-purple-700 dark:text-purple-300 font-semibold mt-0.5">
                               {theoryPoints} marks
@@ -425,7 +467,7 @@ export function InstructionsView({
                     {[
                       { icon: Eye, text: `Tab switches limited to ${TAB_SWITCH_LIMIT}`, sub: 'Exceeding triggers auto-submit' },
                       { icon: MonitorPlay, text: `Fullscreen exits limited to ${FULLSCREEN_EXIT_LIMIT}`, sub: 'Exceeding triggers auto-submit' },
-                      { icon: Clock, text: 'Timer runs continuously', sub: 'Auto-submits when expired' },
+                      { icon: Clock, text: `Duration: ${examDuration} minutes`, sub: 'Timer runs continuously' },
                       { icon: Wifi, text: 'Progress saved automatically', sub: 'Every 30 seconds in background' },
                     ].map((item, i) => (
                       <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/60 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
@@ -463,7 +505,7 @@ export function InstructionsView({
                     <p className="text-xs text-purple-800 dark:text-purple-300 mt-1.5 leading-relaxed">
                       Your <strong className="font-bold">{objectivePoints} objective marks</strong> are graded instantly upon submission. 
                       The <strong className="font-bold">{theoryPoints} theory marks</strong> require teacher review — 
-                      your result will show as <strong className="font-bold text-fuchsia-700 dark:text-fuchsia-400">"Pending Review"</strong> until finalized.
+                      your result will show as <strong className="font-bold text-fuchsia-700 dark:text-fuchsia-400">&quot;Pending Review&quot;</strong> until finalized.
                     </p>
                   </div>
                 </div>
