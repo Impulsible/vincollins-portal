@@ -39,6 +39,7 @@ import {
   Image as ImageIcon,
   Eye,
   EyeOff,
+  Bookmark,
 } from "lucide-react";
 
 type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
@@ -62,7 +63,7 @@ const removeMarksFromText = (text: string): string => {
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COLLAPSIBLE READING PASSAGE DOCK
+// COLLAPSIBLE READING PASSAGE DOCK (PERSISTENT VIA LOCALSTORAGE)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ReadingPassageDock({
@@ -194,7 +195,7 @@ function ReadingPassageDock({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBJECTIVE QUESTION CARD (WITH TABLE & DIAGRAM SUPPORT)
+// OBJECTIVE QUESTION CARD (WITH SECTION SUB-HEADER, TABLE & DIAGRAM SUPPORT)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ObjectiveQuestionCard({
@@ -216,6 +217,12 @@ function ObjectiveQuestionCard({
 
   const imageUrl = question?.image_url || (question as any)?.imageUrl;
   const imageCaption = question?.image_caption || (question as any)?.imageCaption;
+  
+  // Authoritative Section Header / Sub-Header parsed from objective text
+  const sectionHeader =
+    (question as any)?.section_header ||
+    (question as any)?.section ||
+    (question as any)?.instruction;
 
   return (
     <div className="relative rounded-3xl border border-indigo-200/70 dark:border-indigo-800/50 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
@@ -258,7 +265,20 @@ function ObjectiveQuestionCard({
       </div>
 
       {/* Card Content Body */}
-      <div className="p-5 sm:p-6 space-y-6">
+      <div className="p-5 sm:p-6 space-y-5">
+        
+        {/* SECTION / SUB-HEADER BANNER (e.g., Section A, French/Yoruba Instructions) */}
+        {sectionHeader && (
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/40 dark:from-blue-950/50 dark:via-indigo-950/30 dark:to-purple-950/20 border-l-4 border-indigo-600 dark:border-indigo-400 border-y border-r dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-200 shadow-2xs">
+            <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-xs font-bold uppercase tracking-wider block">
+                {sectionHeader}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-sm font-bold flex items-center justify-center shadow-md shadow-indigo-500/30">
             {questionIndex + 1}
@@ -272,8 +292,13 @@ function ObjectiveQuestionCard({
           </div>
         </div>
 
-        {/* Option Choices */}
-        <div className="space-y-2.5 pl-0 sm:pl-11">
+        {/* Option Choices: Dynamic Grid based on choices (2 to 6+ choices) */}
+        <div
+          className={cn(
+            "gap-2.5 pl-0 sm:pl-11 grid",
+            options.length <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+          )}
+        >
           {options.map((option, idx) => {
             const selected = answer === option;
             const letter = OPTION_LETTERS[idx] || String.fromCharCode(65 + idx);
@@ -286,7 +311,7 @@ function ObjectiveQuestionCard({
                   "group relative flex items-start gap-3.5 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 select-none overflow-hidden",
                   selected
                     ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-50/90 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/30 shadow-md shadow-indigo-500/10"
-                    : "border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900",
+                    : "border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900"
                 )}
               >
                 {selected && (
@@ -299,7 +324,7 @@ function ObjectiveQuestionCard({
                     "flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                     selected
                       ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-500 to-blue-500 shadow-sm"
-                      : "border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500 bg-white dark:bg-slate-800",
+                      : "border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500 bg-white dark:bg-slate-800"
                   )}
                 >
                   {selected && (
@@ -327,7 +352,7 @@ function ObjectiveQuestionCard({
                       "flex-shrink-0 h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-bold flex items-center justify-center transition-all",
                       selected
                         ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400",
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
                     )}
                   >
                     {letter}
@@ -425,8 +450,8 @@ function TimerPill({ timeLeft }: { timeLeft: number }) {
         isDanger
           ? "bg-gradient-to-br from-rose-500 to-red-600 text-white ring-rose-300 dark:ring-rose-700 shadow-lg shadow-rose-500/30 dark:shadow-rose-950/50 animate-pulse"
           : isWarning
-            ? "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 text-amber-700 dark:text-amber-400 ring-amber-200 dark:ring-amber-900/50 shadow-sm"
-            : "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-slate-700",
+          ? "bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40 text-amber-700 dark:text-amber-400 ring-amber-200 dark:ring-amber-900/50 shadow-sm"
+          : "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70 text-slate-700 dark:text-slate-300 ring-slate-200 dark:ring-slate-700"
       )}
     >
       <Clock
@@ -435,8 +460,8 @@ function TimerPill({ timeLeft }: { timeLeft: number }) {
           isDanger
             ? "text-white"
             : isWarning
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-slate-500 dark:text-slate-400",
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-slate-500 dark:text-slate-400"
         )}
       />
       <span className="tabular-nums tracking-wider text-[15px]">
@@ -644,6 +669,10 @@ export function ExamInterface({
         : typeof currentQuestion.points === "number"
           ? currentQuestion.points
           : 10,
+    section_header:
+      (currentQuestion as any).section_header ||
+      (currentQuestion as any).section ||
+      undefined,
     sub_questions: currentSubQuestions,
     image_url:
       currentQuestion.image_url ||
@@ -727,14 +756,14 @@ export function ExamInterface({
                   "h-9 px-2.5 gap-1.5 rounded-xl transition-all",
                   isFlagged
                     ? "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-950/60 ring-1 ring-amber-200 dark:ring-amber-900/50"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800",
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >
                 <Flag
                   className={cn(
                     "h-4 w-4",
                     isFlagged &&
-                      "fill-amber-500 text-amber-600 dark:text-amber-400",
+                      "fill-amber-500 text-amber-600 dark:text-amber-400"
                   )}
                 />
                 <span className="hidden sm:inline text-xs font-semibold">
@@ -834,7 +863,7 @@ export function ExamInterface({
                   "h-12 px-4 rounded-2xl gap-1.5 font-semibold text-sm transition-all shadow-sm",
                   showQuestionPalette
                     ? "bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-200 dark:ring-indigo-900/50"
-                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800",
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 )}
                 title="Question palette"
               >
@@ -848,7 +877,7 @@ export function ExamInterface({
                   "flex-1 h-12 rounded-2xl gap-2 font-bold text-sm shadow-md transition-all",
                   isLast
                     ? "bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 dark:from-emerald-600 dark:to-teal-700 dark:hover:from-emerald-700 dark:hover:to-teal-800 text-white shadow-emerald-500/30 dark:shadow-emerald-950/50"
-                    : "bg-gradient-to-br from-indigo-600 to-blue-700 hover:from-indigo-700 hover:to-blue-800 dark:from-indigo-700 dark:to-blue-800 dark:hover:from-indigo-800 dark:hover:to-blue-900 text-white shadow-indigo-500/30 dark:shadow-indigo-950/50",
+                    : "bg-gradient-to-br from-indigo-600 to-blue-700 hover:from-indigo-700 hover:to-blue-800 dark:from-indigo-700 dark:to-blue-800 dark:hover:from-indigo-800 dark:hover:to-blue-900 text-white shadow-indigo-500/30 dark:shadow-indigo-950/50"
                 )}
               >
                 {isLast ? (

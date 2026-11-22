@@ -1,4 +1,5 @@
-// src/components/staff/exams/create/steps/PreviewStep.tsx - WITH ENHANCED DARK MODE & TABLE/DIAGRAM RENDERER
+// src/components/staff/exams/create/steps/PreviewStep.tsx
+// WITH ENHANCED DARK MODE, SUB-HEADER / SECTION PARSER RENDERER & TABLE/DIAGRAM SUPPORT
 
 "use client";
 
@@ -6,6 +7,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Clock, Eye, ChevronLeft, ChevronRight, Table,
   Image as ImageIcon, BookOpen, Calculator,
+  Layers, Bookmark, Sparkles, HelpCircle, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,8 +45,6 @@ const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0
         {level === 0 ? "Sub-questions:" : "Parts:"}
       </p>
       {subQuestions.map((sq, idx) => {
-        const hasTableContent = hasTable(sq.text || "");
-
         return (
           <div
             key={idx}
@@ -93,7 +93,10 @@ export function PreviewStep({
 
   const objectiveCount = questions.length;
   const theoryCount = hasTheory ? theoryQuestions.length : 0;
-  const totalObjectivePoints = questions.reduce((acc, q) => acc + (q.marks || defaultMark || 0.5), 0);
+  const totalObjectivePoints = questions.reduce(
+    (acc, q) => acc + (Number(q.marks) || defaultMark || 0.5),
+    0
+  );
   const totalTheoryPoints = theoryTotalMarks || theoryMax || 0;
   const totalMarks = totalObjectivePoints + totalTheoryPoints;
   const isBalanced = totalMarks === EXAM_TOTAL;
@@ -262,8 +265,9 @@ export function PreviewStep({
 
         {/* CBT PREVIEW */}
         <div>
-          <p className="text-[10px] font-bold text-gray-600 dark:text-slate-400 uppercase tracking-wide mb-2">
-            Student CBT Card Preview
+          <p className="text-[10px] font-bold text-gray-600 dark:text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+            <span>Student CBT Card Preview</span>
           </p>
 
           {passageText && (
@@ -294,8 +298,8 @@ export function PreviewStep({
 }
 
 type PreviewQuestion =
-  | (Question & { _type: "objective" })
-  | (TheoryQuestion & { _type: "theory" });
+  | (Question & { _type: "objective"; section_header?: string })
+  | (TheoryQuestion & { _type: "theory"; section_header?: string });
 
 function CBTPreview({
   examDetails,
@@ -317,9 +321,17 @@ function CBTPreview({
 
   const allQuestions = useMemo<PreviewQuestion[]>(
     () => [
-      ...questions.map((q) => ({ ...q, _type: "objective" as const })),
+      ...questions.map((q) => ({ 
+        ...q, 
+        _type: "objective" as const,
+        section_header: (q as any).section_header || (q as any).section || undefined
+      })),
       ...(hasTheory
-        ? theoryQuestions.map((q) => ({ ...q, _type: "theory" as const }))
+        ? theoryQuestions.map((q) => ({ 
+            ...q, 
+            _type: "theory" as const,
+            section_header: (q as any).section_header || (q as any).section || undefined
+          }))
         : []),
     ],
     [questions, theoryQuestions, hasTheory]
@@ -362,6 +374,7 @@ function CBTPreview({
 
   const hasTableContent = hasTable(current?.question || "");
   const hasDiagram = !!current?.image_url;
+  const sectionHeader = current?.section_header;
 
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
@@ -393,6 +406,7 @@ function CBTPreview({
           {allQuestions.map((q, idx) => {
             const hasTableIndicator = hasTable(q.question);
             const hasDiagramIndicator = !!q.image_url;
+            const hasSectionIndicator = !!q.section_header;
 
             return (
               <button
@@ -406,11 +420,16 @@ function CBTPreview({
                     ? "bg-emerald-500 dark:bg-emerald-600 text-white"
                     : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
                 )}
-                title={`Question ${idx + 1}${hasTableIndicator ? " (Contains Table)" : ""}${hasDiagramIndicator ? " (Contains Diagram)" : ""}`}
+                title={`Question ${idx + 1}${q.section_header ? ` - [${q.section_header}]` : ""}${hasTableIndicator ? " (Contains Table)" : ""}${hasDiagramIndicator ? " (Contains Diagram)" : ""}`}
               >
                 {idx + 1}
-                {(hasTableIndicator || hasDiagramIndicator) && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full" />
+                {(hasTableIndicator || hasDiagramIndicator || hasSectionIndicator) && (
+                  <span 
+                    className={cn(
+                      "absolute -top-1 -right-1 w-2 h-2 rounded-full",
+                      hasSectionIndicator ? "bg-amber-500" : "bg-blue-500"
+                    )} 
+                  />
                 )}
               </button>
             );
@@ -421,10 +440,23 @@ function CBTPreview({
       {/* QUESTION BODY */}
       {current && (
         <div className="p-3 sm:p-5 space-y-4">
+          
+          {/* SECTION HEADER / INSTRUCTION CALLOUT BANNER (FROM OBJECTIVE PARSER) */}
+          {sectionHeader && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-50 via-indigo-50/60 to-transparent dark:from-purple-950/40 dark:via-indigo-950/20 dark:to-transparent border-l-4 border-purple-600 dark:border-purple-400 border-y border-r dark:border-purple-900/40 text-purple-900 dark:text-purple-200 shadow-2xs">
+              <Layers className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[11px] font-bold uppercase tracking-wider block">
+                  {sectionHeader}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="bg-slate-50/70 dark:bg-slate-950/70 rounded-xl border border-slate-200 dark:border-slate-800 p-3.5 shadow-sm space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-              <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
-                Question {currentIndex + 1}{" "}
+              <p className="text-xs font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                <span>Question {currentIndex + 1}</span>
                 <span className="text-slate-400 dark:text-slate-500 font-normal">
                   ({current._type === "objective" ? "Objective" : "Theory"})
                 </span>
@@ -461,7 +493,7 @@ function CBTPreview({
             />
           </div>
 
-          {/* OBJECTIVE: MCQ OPTIONS */}
+          {/* OBJECTIVE: DYNAMIC MCQ OPTIONS (A-D, A-E, A-F, ETC.) */}
           {current._type === "objective" && current.options && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
               {current.options.map((opt, idx) => {
@@ -488,6 +520,7 @@ function CBTPreview({
                     </div>
                     <input
                       type="radio"
+                      name={`option_${current.id}`}
                       className="hidden"
                       checked={isSelected}
                       onChange={() =>
