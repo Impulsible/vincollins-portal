@@ -1,58 +1,83 @@
 // src/components/student/exam/views/InstructionsView.tsx
-'use client'
+"use client";
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  BookOpen, User, Clock, Calendar,
-  FileText, Shield, Lock, Loader2, Award,
-  Target, AlertCircle, CheckCircle2, ArrowLeft,
-  MonitorPlay, Wifi, Eye, PenTool, CheckSquare,
-  Sparkles, Zap, GraduationCap, ShieldCheck,
-  Hash, Timer, TrendingUp, ChevronRight, Info,
-} from 'lucide-react'
-import Image from 'next/image'
-import { TERM_NAMES, TAB_SWITCH_LIMIT, FULLSCREEN_EXIT_LIMIT } from '@/app/student/exam/[id]/constants'
-import type { Exam, Question } from '@/app/student/exam/[id]/types'
-import { useState, useMemo } from 'react'
-import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+  BookOpen,
+  User,
+  Clock,
+  Calendar,
+  FileText,
+  Shield,
+  Lock,
+  Loader2,
+  Award,
+  Target,
+  AlertCircle,
+  CheckCircle2,
+  ArrowLeft,
+  MonitorPlay,
+  Wifi,
+  Eye,
+  PenTool,
+  CheckSquare,
+  Sparkles,
+  Zap,
+  GraduationCap,
+  ShieldCheck,
+  Hash,
+  Timer,
+  TrendingUp,
+  ChevronRight,
+  Info,
+} from "lucide-react";
+import Image from "next/image";
+import {
+  TERM_NAMES,
+  TAB_SWITCH_LIMIT,
+  FULLSCREEN_EXIT_LIMIT,
+} from "@/app/student/exam/[id]/constants";
+import type { Exam, Question } from "@/app/student/exam/[id]/types";
+import { useState, useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface StudentProfile {
-  photo_url?: string | null
-  full_name?: string | null
-  vin_id?: string | null
-  class?: string | null
-  email?: string | null
+  photo_url?: string | null;
+  full_name?: string | null;
+  vin_id?: string | null;
+  class?: string | null;
+  email?: string | null;
 }
 
 interface InstructionsViewProps {
-  exam: Exam
-  profile: StudentProfile | null
-  allQuestions: Question[]
-  startingExam: boolean
-  onStart: () => void
-  onCancel: () => void
+  exam: Exam;
+  profile: StudentProfile | null;
+  allQuestions: Question[];
+  startingExam: boolean;
+  onStart: () => void;
+  onCancel: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SAFE EXTRACTORS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function safeString(v: unknown, fallback = ''): string {
-  if (typeof v === 'string') return v
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
-  return fallback
+function safeString(v: unknown, fallback = ""): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return fallback;
 }
 
 function safeNumber(v: unknown, fallback = 0): number {
-  if (typeof v === 'number' && Number.isFinite(v)) return v
-  if (typeof v === 'string') {
-    const n = Number(v)
-    if (Number.isFinite(n)) return n
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
   }
-  return fallback
+  return fallback;
 }
 
 export function InstructionsView({
@@ -63,80 +88,114 @@ export function InstructionsView({
   onStart,
   onCancel,
 }: InstructionsViewProps) {
-  const [agreedToRules, setAgreedToRules] = useState(false)
+  const [agreedToRules, setAgreedToRules] = useState(false);
 
-  const examTitle = safeString(exam?.title, 'Assessment')
-  const examSubject = safeString(exam?.subject, '—')
-  const examClass = safeString(exam?.class, '')
-  const examDuration = safeNumber(exam?.duration ?? (exam as any)?.duration_minutes, 60)
-  const examPassingPct = safeNumber((exam as any)?.passing_percentage ?? exam?.passing_score, 50)
-  const examInstructions = safeString(exam?.instructions, '')
-  const examTermRaw = safeString((exam as any)?.term, '')
-  const examSession = safeString((exam as any)?.session_year ?? (exam as any)?.session, 'Current Session')
+  const examTitle = safeString(exam?.title, "Assessment");
+  const examSubject = safeString(exam?.subject, "—");
+  const examClass = safeString(exam?.class, "");
+  const examDuration = safeNumber(
+    exam?.duration ?? (exam as any)?.duration_minutes,
+    60,
+  );
+  const examPassingPct = safeNumber(
+    (exam as any)?.passing_percentage ?? exam?.passing_score,
+    50,
+  );
+  const examInstructions = safeString(exam?.instructions, "");
+  const examTermRaw = safeString((exam as any)?.term, "");
+  const examSession = safeString(
+    (exam as any)?.session_year ?? (exam as any)?.session,
+    "Current Session",
+  );
 
   // 1. DYNAMIC QUESTIONS & MARKS CALCULATION
-  const objectiveQuestions = useMemo(() => allQuestions.filter(q => q.type !== 'theory'), [allQuestions])
-  const theoryQuestions = useMemo(() => allQuestions.filter(q => q.type === 'theory'), [allQuestions])
+  const objectiveQuestions = useMemo(
+    () => allQuestions.filter((q) => q.type !== "theory"),
+    [allQuestions],
+  );
+  const theoryQuestions = useMemo(
+    () => allQuestions.filter((q) => q.type === "theory"),
+    [allQuestions],
+  );
 
-  const hasTheory = theoryQuestions.length > 0
+  const hasTheory = theoryQuestions.length > 0;
 
   // Derive marks respecting both `marks` and `points` properties
   const objectivePoints = useMemo(() => {
-    if ((exam as any)?.objective_marks != null && Number((exam as any).objective_marks) > 0) {
-      return Number((exam as any).objective_marks)
+    if (
+      (exam as any)?.objective_marks != null &&
+      Number((exam as any).objective_marks) > 0
+    ) {
+      return Number((exam as any).objective_marks);
     }
     return objectiveQuestions.reduce(
       (sum, q) => sum + Number((q as any).marks ?? (q as any).points ?? 1),
-      0
-    )
-  }, [exam, objectiveQuestions])
+      0,
+    );
+  }, [exam, objectiveQuestions]);
 
-  const requiredTheoryCount = (exam as any)?.required_theory_count ?? (exam as any)?.theory_answer_count ?? theoryQuestions.length
+  const requiredTheoryCount =
+    (exam as any)?.required_theory_count ??
+    (exam as any)?.theory_answer_count ??
+    theoryQuestions.length;
 
   const theoryPoints = useMemo(() => {
-    if (!hasTheory) return 0
-    if ((exam as any)?.theory_marks != null && Number((exam as any).theory_marks) > 0) {
-      return Number((exam as any).theory_marks)
+    if (!hasTheory) return 0;
+    if (
+      (exam as any)?.theory_marks != null &&
+      Number((exam as any).theory_marks) > 0
+    ) {
+      return Number((exam as any).theory_marks);
     }
-    
+
     // If student answers N of M, score the per-question mark multiplied by required count
-    if (theoryQuestions.length > 0 && requiredTheoryCount < theoryQuestions.length) {
-      const perQuestionMark = Number((theoryQuestions[0] as any)?.marks ?? (theoryQuestions[0] as any)?.points ?? 10)
-      return perQuestionMark * requiredTheoryCount
+    if (
+      theoryQuestions.length > 0 &&
+      requiredTheoryCount < theoryQuestions.length
+    ) {
+      const perQuestionMark = Number(
+        (theoryQuestions[0] as any)?.marks ??
+          (theoryQuestions[0] as any)?.points ??
+          10,
+      );
+      return perQuestionMark * requiredTheoryCount;
     }
 
     return theoryQuestions.reduce(
       (sum, q) => sum + Number((q as any).marks ?? (q as any).points ?? 10),
-      0
-    )
-  }, [exam, hasTheory, theoryQuestions, requiredTheoryCount])
+      0,
+    );
+  }, [exam, hasTheory, theoryQuestions, requiredTheoryCount]);
 
   const totalPoints = useMemo(() => {
-    if ((exam as any)?.total_marks != null && Number((exam as any).total_marks) > 0) {
-      return Number((exam as any).total_marks)
+    if (
+      (exam as any)?.total_marks != null &&
+      Number((exam as any).total_marks) > 0
+    ) {
+      return Number((exam as any).total_marks);
     }
-    return Number((objectivePoints + theoryPoints).toFixed(2))
-  }, [exam, objectivePoints, theoryPoints])
+    return Number((objectivePoints + theoryPoints).toFixed(2));
+  }, [exam, objectivePoints, theoryPoints]);
 
   // 2. MATHEMATICAL 100% PERCENTAGE GUARANTEE (Fixes 101% bug)
   const { objectivePct, theoryPct } = useMemo(() => {
-    if (totalPoints <= 0) return { objectivePct: 100, theoryPct: 0 }
-    if (!hasTheory) return { objectivePct: 100, theoryPct: 0 }
-    
-    const rawObj = (objectivePoints / totalPoints) * 100
-    const objPct = Math.round(rawObj)
-    const thPct = Math.max(0, 100 - objPct) // Forces exact 100% sum
-    return { objectivePct: objPct, theoryPct: thPct }
-  }, [totalPoints, objectivePoints, hasTheory])
+    if (totalPoints <= 0) return { objectivePct: 100, theoryPct: 0 };
+    if (!hasTheory) return { objectivePct: 100, theoryPct: 0 };
+
+    const rawObj = (objectivePoints / totalPoints) * 100;
+    const objPct = Math.round(rawObj);
+    const thPct = Math.max(0, 100 - objPct); // Forces exact 100% sum
+    return { objectivePct: objPct, theoryPct: thPct };
+  }, [totalPoints, objectivePoints, hasTheory]);
 
   const termLabel = examTermRaw
     ? (TERM_NAMES[examTermRaw as keyof typeof TERM_NAMES] ?? examTermRaw)
-    : 'Current Term'
+    : "Current Term";
 
-  const sessionLabel = examSession
+  const sessionLabel = examSession;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* 🎨 TOP BAR                                                     */}
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -153,13 +212,17 @@ export function InstructionsView({
                 </h1>
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap mt-0.5">
                   <span className="flex items-center gap-1 font-medium">
-                    <BookOpen className="h-3 w-3" />{examSubject}
+                    <BookOpen className="h-3 w-3" />
+                    {examSubject}
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span className="flex items-center gap-1 font-medium">
-                    <GraduationCap className="h-3 w-3" />{examClass}
+                    <GraduationCap className="h-3 w-3" />
+                    {examClass}
                   </span>
-                  <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
+                  <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">
+                    ·
+                  </span>
                   <span className="hidden sm:flex items-center gap-1 font-medium">
                     <Calendar className="h-3 w-3" />
                     {termLabel} · {sessionLabel}
@@ -177,13 +240,11 @@ export function InstructionsView({
 
       <div className="max-w-6xl mx-auto py-6 sm:py-8 px-4 sm:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-          
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* 👤 LEFT COLUMN — CANDIDATE                                  */}
           {/* ═══════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-2">
             <div className="lg:sticky lg:top-24 space-y-4">
-              
               {/* Candidate Verification Card */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -198,16 +259,16 @@ export function InstructionsView({
                       Candidate Verification
                     </h3>
                   </div>
-                  
+
                   <CardContent className="p-5 flex flex-col items-center bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-800/50">
                     <div className="relative mb-4">
                       <div className="absolute -inset-1 bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 rounded-2xl opacity-20 blur" />
-                      
+
                       {profile?.photo_url ? (
                         <div className="relative w-40 h-48 sm:w-44 sm:h-52 border-[3px] border-white dark:border-slate-700 rounded-2xl overflow-hidden shadow-2xl shadow-indigo-200/50 dark:shadow-indigo-950/50">
                           <Image
                             src={profile.photo_url}
-                            alt={profile.full_name || 'Student'}
+                            alt={profile.full_name || "Student"}
                             width={192}
                             height={224}
                             className="w-full h-full object-cover"
@@ -222,26 +283,28 @@ export function InstructionsView({
                           <User className="h-16 w-16 text-slate-300 dark:text-slate-600" />
                         </div>
                       )}
-                      
+
                       <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
                         <Badge className="bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-800 dark:to-slate-600 text-white text-[10px] font-bold px-3 py-1 shadow-xl border border-white/20 tracking-wider font-mono">
                           <Hash className="h-2.5 w-2.5 mr-1" />
-                          {profile?.vin_id || 'VIN-STD-0000'}
+                          {profile?.vin_id || "VIN-STD-0000"}
                         </Badge>
                       </div>
                     </div>
 
                     <div className="mt-3 text-center space-y-0.5 w-full">
                       <h3 className="text-slate-900 dark:text-slate-100 font-bold text-base leading-tight">
-                        {profile?.full_name || 'Student Candidate'}
+                        {profile?.full_name || "Student Candidate"}
                       </h3>
                       <div className="flex items-center justify-center gap-1.5 pt-0.5">
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-full">
                           <GraduationCap className="h-2.5 w-2.5" />
-                          {profile?.class ?? examClass ?? '—'}
+                          {profile?.class ?? examClass ?? "—"}
                         </span>
                       </div>
-                      <p className="text-slate-400 dark:text-slate-500 text-[11px] truncate pt-1">{profile?.email}</p>
+                      <p className="text-slate-400 dark:text-slate-500 text-[11px] truncate pt-1">
+                        {profile?.email}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -256,22 +319,52 @@ export function InstructionsView({
               >
                 <Card className="border-slate-200/60 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 rounded-2xl overflow-hidden">
                   <div className="px-4 py-2.5 bg-slate-50/60 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Exam Snapshot</p>
+                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                      Exam Snapshot
+                    </p>
                   </div>
                   <CardContent className="p-4 space-y-3">
                     {[
-                      { icon: Timer, label: 'Duration', value: `${examDuration} min`, color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40' },
-                      { icon: Award, label: 'Total Marks', value: `${totalPoints} pts`, color: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40' },
-                      { icon: Target, label: 'Pass Mark', value: `${examPassingPct}%`, color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40' },
+                      {
+                        icon: Timer,
+                        label: "Duration",
+                        value: `${examDuration} min`,
+                        color:
+                          "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40",
+                      },
+                      {
+                        icon: Award,
+                        label: "Total Marks",
+                        value: `${totalPoints} pts`,
+                        color:
+                          "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40",
+                      },
+                      {
+                        icon: Target,
+                        label: "Pass Mark",
+                        value: `${examPassingPct}%`,
+                        color:
+                          "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40",
+                      },
                     ].map((stat, i) => (
-                      <div key={i} className="flex items-center justify-between">
+                      <div
+                        key={i}
+                        className="flex items-center justify-between"
+                      >
                         <span className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 font-medium">
-                          <span className={cn("h-6 w-6 rounded-lg flex items-center justify-center", stat.color)}>
+                          <span
+                            className={cn(
+                              "h-6 w-6 rounded-lg flex items-center justify-center",
+                              stat.color,
+                            )}
+                          >
                             <stat.icon className="h-3 w-3" />
                           </span>
                           {stat.label}
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm tabular-nums">{stat.value}</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm tabular-nums">
+                          {stat.value}
+                        </span>
                       </div>
                     ))}
                   </CardContent>
@@ -284,7 +377,6 @@ export function InstructionsView({
           {/* 📄 RIGHT COLUMN — MAIN CONTENT                              */}
           {/* ═══════════════════════════════════════════════════════════ */}
           <div className="lg:col-span-5 space-y-4">
-            
             {/* Stats Grid */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -293,10 +385,38 @@ export function InstructionsView({
               className="grid grid-cols-2 sm:grid-cols-4 gap-3"
             >
               {[
-                { icon: FileText, label: 'Questions', value: String(allQuestions.length), gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50 dark:bg-blue-950/40', text: 'text-blue-600 dark:text-blue-400' },
-                { icon: Award, label: 'Total Marks', value: String(totalPoints), gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-600 dark:text-amber-400' },
-                { icon: Target, label: 'Pass Mark', value: `${examPassingPct}%`, gradient: 'from-emerald-500 to-green-500', bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-600 dark:text-emerald-400' },
-                { icon: Lock, label: 'Attempts', value: '1', gradient: 'from-violet-500 to-purple-500', bg: 'bg-violet-50 dark:bg-violet-950/40', text: 'text-violet-600 dark:text-violet-400' },
+                {
+                  icon: FileText,
+                  label: "Questions",
+                  value: String(allQuestions.length),
+                  gradient: "from-blue-500 to-cyan-500",
+                  bg: "bg-blue-50 dark:bg-blue-950/40",
+                  text: "text-blue-600 dark:text-blue-400",
+                },
+                {
+                  icon: Award,
+                  label: "Total Marks",
+                  value: String(totalPoints),
+                  gradient: "from-amber-500 to-orange-500",
+                  bg: "bg-amber-50 dark:bg-amber-950/40",
+                  text: "text-amber-600 dark:text-amber-400",
+                },
+                {
+                  icon: Target,
+                  label: "Pass Mark",
+                  value: `${examPassingPct}%`,
+                  gradient: "from-emerald-500 to-green-500",
+                  bg: "bg-emerald-50 dark:bg-emerald-950/40",
+                  text: "text-emerald-600 dark:text-emerald-400",
+                },
+                {
+                  icon: Lock,
+                  label: "Attempts",
+                  value: "1",
+                  gradient: "from-violet-500 to-purple-500",
+                  bg: "bg-violet-50 dark:bg-violet-950/40",
+                  text: "text-violet-600 dark:text-violet-400",
+                },
               ].map((item, i) => (
                 <motion.div
                   key={i}
@@ -305,13 +425,28 @@ export function InstructionsView({
                   transition={{ duration: 0.3, delay: i * 0.05 }}
                   className="relative bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-md dark:hover:shadow-slate-950/50 transition-all p-4 overflow-hidden group"
                 >
-                  <div className={cn("absolute top-0 right-0 h-16 w-16 opacity-10 rounded-full -mr-6 -mt-6 blur-xl bg-gradient-to-br group-hover:opacity-20 transition-opacity", item.gradient)} />
+                  <div
+                    className={cn(
+                      "absolute top-0 right-0 h-16 w-16 opacity-10 rounded-full -mr-6 -mt-6 blur-xl bg-gradient-to-br group-hover:opacity-20 transition-opacity",
+                      item.gradient,
+                    )}
+                  />
                   <div className="relative">
-                    <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center mb-2", item.bg, item.text)}>
+                    <div
+                      className={cn(
+                        "h-9 w-9 rounded-xl flex items-center justify-center mb-2",
+                        item.bg,
+                        item.text,
+                      )}
+                    >
                       <item.icon className="h-4 w-4" />
                     </div>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-none">{item.value}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider mt-1.5">{item.label}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums leading-none">
+                      {item.value}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider mt-1.5">
+                      {item.label}
+                    </p>
                   </div>
                 </motion.div>
               ))}
@@ -333,7 +468,7 @@ export function InstructionsView({
                     {totalPoints} TOTAL MARKS
                   </span>
                 </div>
-                
+
                 <CardContent className="p-4 sm:p-5">
                   {totalPoints > 0 && (
                     <div className="mb-5">
@@ -352,18 +487,26 @@ export function InstructionsView({
                         </div>
                       </div>
                       <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-inner">
-                        <motion.div 
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${objectivePct}%` }}
-                          transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-                          className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full" 
+                          transition={{
+                            duration: 0.8,
+                            delay: 0.2,
+                            ease: "easeOut",
+                          }}
+                          className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full"
                         />
                         {hasTheory && (
-                          <motion.div 
+                          <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${theoryPct}%` }}
-                            transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
-                            className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-full" 
+                            transition={{
+                              duration: 0.8,
+                              delay: 0.4,
+                              ease: "easeOut",
+                            }}
+                            className="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-full"
                           />
                         )}
                       </div>
@@ -440,10 +583,14 @@ export function InstructionsView({
                     <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm">
                       <FileText className="h-4 w-4 text-white" />
                     </div>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Exam Instructions</h3>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                      Exam Instructions
+                    </h3>
                   </div>
                   <CardContent className="p-4 sm:p-5">
-                    <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">{examInstructions}</p>
+                    <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line">
+                      {examInstructions}
+                    </p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -460,23 +607,48 @@ export function InstructionsView({
                   <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
                     <Shield className="h-4 w-4 text-white" />
                   </div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Security & Monitoring</h3>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                    Security & Monitoring
+                  </h3>
                 </div>
                 <CardContent className="p-4 sm:p-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {[
-                      { icon: Eye, text: `Tab switches limited to ${TAB_SWITCH_LIMIT}`, sub: 'Exceeding triggers auto-submit' },
-                      { icon: MonitorPlay, text: `Fullscreen exits limited to ${FULLSCREEN_EXIT_LIMIT}`, sub: 'Exceeding triggers auto-submit' },
-                      { icon: Clock, text: `Duration: ${examDuration} minutes`, sub: 'Timer runs continuously' },
-                      { icon: Wifi, text: 'Progress saved automatically', sub: 'Every 30 seconds in background' },
+                      {
+                        icon: Eye,
+                        text: `Tab switches limited to ${TAB_SWITCH_LIMIT}`,
+                        sub: "Exceeding triggers auto-submit",
+                      },
+                      {
+                        icon: MonitorPlay,
+                        text: `Fullscreen exits limited to ${FULLSCREEN_EXIT_LIMIT}`,
+                        sub: "Exceeding triggers auto-submit",
+                      },
+                      {
+                        icon: Clock,
+                        text: `Duration: ${examDuration} minutes`,
+                        sub: "Timer runs continuously",
+                      },
+                      {
+                        icon: Wifi,
+                        text: "Progress saved automatically",
+                        sub: "Every 30 seconds in background",
+                      },
                     ].map((item, i) => (
-                      <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/60 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <div
+                        key={i}
+                        className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50/60 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      >
                         <div className="h-7 w-7 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 flex items-center justify-center shrink-0 shadow-sm">
                           <item.icon className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">{item.text}</p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{item.sub}</p>
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">
+                            {item.text}
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {item.sub}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -503,9 +675,19 @@ export function InstructionsView({
                       Two-Part Grading System
                     </p>
                     <p className="text-xs text-purple-800 dark:text-purple-300 mt-1.5 leading-relaxed">
-                      Your <strong className="font-bold">{objectivePoints} objective marks</strong> are graded instantly upon submission. 
-                      The <strong className="font-bold">{theoryPoints} theory marks</strong> require teacher review — 
-                      your result will show as <strong className="font-bold text-fuchsia-700 dark:text-fuchsia-400">&quot;Pending Review&quot;</strong> until finalized.
+                      Your{" "}
+                      <strong className="font-bold">
+                        {objectivePoints} objective marks
+                      </strong>{" "}
+                      are graded instantly upon submission. The{" "}
+                      <strong className="font-bold">
+                        {theoryPoints} theory marks
+                      </strong>{" "}
+                      require teacher review — your result will show as{" "}
+                      <strong className="font-bold text-fuchsia-700 dark:text-fuchsia-400">
+                        &quot;Pending Review&quot;
+                      </strong>{" "}
+                      until finalized.
                     </p>
                   </div>
                 </div>
@@ -520,12 +702,14 @@ export function InstructionsView({
             >
               <Card className="border-slate-200/60 dark:border-slate-800 shadow-xl shadow-slate-200/40 dark:shadow-slate-950/50 bg-white dark:bg-slate-900 rounded-2xl overflow-hidden">
                 <CardContent className="p-5 sm:p-6">
-                  <label className={cn(
-                    "flex items-start gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all mb-5",
-                    agreedToRules 
-                      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50" 
-                      : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                  )}>
+                  <label
+                    className={cn(
+                      "flex items-start gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all mb-5",
+                      agreedToRules
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50"
+                        : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600",
+                    )}
+                  >
                     <div className="relative shrink-0 mt-0.5">
                       <input
                         type="checkbox"
@@ -533,24 +717,37 @@ export function InstructionsView({
                         onChange={(e) => setAgreedToRules(e.target.checked)}
                         className="peer sr-only"
                       />
-                      <div className={cn(
-                        "h-5 w-5 rounded-md border-2 transition-all flex items-center justify-center",
-                        agreedToRules 
-                          ? "bg-emerald-500 border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600" 
-                          : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 peer-hover:border-slate-400 dark:peer-hover:border-slate-500"
-                      )}>
-                        {agreedToRules && <CheckCircle2 className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
+                      <div
+                        className={cn(
+                          "h-5 w-5 rounded-md border-2 transition-all flex items-center justify-center",
+                          agreedToRules
+                            ? "bg-emerald-500 border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
+                            : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 peer-hover:border-slate-400 dark:peer-hover:border-slate-500",
+                        )}
+                      >
+                        {agreedToRules && (
+                          <CheckCircle2
+                            className="h-3.5 w-3.5 text-white"
+                            strokeWidth={3}
+                          />
+                        )}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm font-semibold transition-colors",
-                        agreedToRules ? "text-emerald-900 dark:text-emerald-200" : "text-slate-800 dark:text-slate-200"
-                      )}>
+                      <p
+                        className={cn(
+                          "text-sm font-semibold transition-colors",
+                          agreedToRules
+                            ? "text-emerald-900 dark:text-emerald-200"
+                            : "text-slate-800 dark:text-slate-200",
+                        )}
+                      >
                         I agree to the exam rules and conditions
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        I understand that violating security rules will trigger automatic submission, and I acknowledge this exam cannot be retaken.
+                        I understand that violating security rules will trigger
+                        automatic submission, and I acknowledge this exam cannot
+                        be retaken.
                       </p>
                     </div>
                   </label>
@@ -571,7 +768,7 @@ export function InstructionsView({
                         "flex-1 order-1 sm:order-2 h-12 rounded-xl font-bold text-white shadow-lg transition-all",
                         "bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 dark:from-violet-700 dark:via-indigo-700 dark:to-blue-700",
                         "hover:shadow-xl hover:shadow-indigo-300 dark:hover:shadow-indigo-950/50 hover:scale-[1.01] active:scale-[0.99]",
-                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
+                        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none",
                       )}
                     >
                       {startingExam ? (
@@ -590,7 +787,7 @@ export function InstructionsView({
                   </div>
 
                   {!agreedToRules && (
-                    <motion.p 
+                    <motion.p
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="text-center text-[11px] text-amber-700 dark:text-amber-400 mt-4 flex items-center justify-center gap-1 font-medium"
@@ -605,11 +802,14 @@ export function InstructionsView({
 
             <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 pt-2">
               <Info className="h-3 w-3" />
-              <span>Single-attempt exam · Ensure a quiet environment with stable internet connection</span>
+              <span>
+                Single-attempt exam · Ensure a quiet environment with stable
+                internet connection
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  )
+    </main>
+  );
 }
