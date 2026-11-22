@@ -89,7 +89,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Programming': { icon: Code, color: 'text-violet-600', bgColor: 'bg-violet-50' },
   
   // ============================================
-  // LANGUAGES
+  // LANGUAGES (LOCKED FROM SHUFFLING)
   // ============================================
   'French': { icon: Languages, color: 'text-red-600', bgColor: 'bg-red-50' },
   'Yoruba': { icon: Languages, color: 'text-orange-600', bgColor: 'bg-orange-50' },
@@ -151,7 +151,6 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Practical': { icon: Target, color: 'text-green-600', bgColor: 'bg-green-50' },
 }
 
-// ✅ DYNAMIC TERM NAMES
 export const TERM_NAMES: Record<string, string> = {
   first: 'First Term',
   second: 'Second Term',
@@ -164,7 +163,6 @@ export const DEFAULT_SUBJECT_CONFIG: SubjectConfig = {
   bgColor: 'bg-gray-50'
 }
 
-// ✅ SUBJECTS BY DEPARTMENT - ALL 10 SUBJECTS FOR SS
 export const SUBJECTS_BY_DEPARTMENT: Record<string, string[]> = {
   'Science': [
     'English Language',
@@ -203,7 +201,6 @@ export const SUBJECTS_BY_DEPARTMENT: Record<string, string[]> = {
     'Data Processing'
   ],
   'General': [
-    // JSS subjects - 17 subjects
     'English Language',
     'Mathematics',
     'Basic Science',
@@ -224,7 +221,6 @@ export const SUBJECTS_BY_DEPARTMENT: Record<string, string[]> = {
   ]
 }
 
-// ✅ Get subjects by department
 export function getSubjectsByDepartment(department: string): string[] {
   const normalizedDept = department?.trim().toUpperCase() || ''
   
@@ -241,25 +237,20 @@ export function getSubjectsByDepartment(department: string): string[] {
   return SUBJECTS_BY_DEPARTMENT.General
 }
 
-// ✅ Get subject count by department
 export function getSubjectCountByDepartment(department: string): number {
   return getSubjectsByDepartment(department).length
 }
 
-// ✅ Get subject count by class level (JSS = 17, SS = 10)
 export function getSubjectCountByClassLevel(className: string): number {
   if (!className) return 0
-  
   const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
   
-  // JSS classes - 17 subjects
   if (normalizedClass.includes('JSS1') || 
       normalizedClass.includes('JSS2') || 
       normalizedClass.includes('JSS3')) {
     return 17
   }
   
-  // SS classes - 10 subjects
   if (normalizedClass.includes('SS1') || 
       normalizedClass.includes('SS2') || 
       normalizedClass.includes('SS3')) {
@@ -270,19 +261,61 @@ export function getSubjectCountByClassLevel(className: string): number {
 }
 
 /* ============================================================
-   ✅ ADDED: RELATIVE-OPTION DETECTION
-   ------------------------------------------------------------
-   Used by ObjectiveQuestionsStep to lock option shuffling for
-   items whose choices depend on each other (e.g. "All of the
-   above", "Both A and B"). Shuffling those would break the
-   question's logic.
-
-   Exported from this shared constants file so both the student
-   runner and the staff exam builder can rely on the same list.
+   SHUFFLE PREVENTION & RELATIVE OPTION CONSTANTS
    ============================================================ */
 
-/** Canonical relative phrases (already normalized to lowercase). */
+export function stripDiacritics(str: string): string {
+  if (!str) return ''
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+export const SHUFFLE_EXCLUDED_SUBJECTS: readonly string[] = [
+  // Yoruba & dialects
+  'yoruba',
+  'ede yoruba',
+  'ede',
+  'yoruba language',
+  'yoruba studies',
+
+  // French & French Studies
+  'french',
+  'francais',
+  'french language',
+  'langue francaise',
+  'french studies',
+  'etudes francaises',
+
+  // English & Literature
+  'english',
+  'english language',
+  'english studies',
+  'use of english',
+  'general english',
+  'literature',
+  'literature in english',
+  'literature-in-english',
+  'oral english',
+
+  // Other Nigerian & Foreign Languages
+  'igbo',
+  'asusu igbo',
+  'igbo language',
+  'hausa',
+  'harshen hausa',
+  'hausa language',
+  'arabic',
+  'arabic language',
+  'german',
+
+  // Comprehension & Aptitude
+  'verbal reasoning',
+  'verbal aptitude',
+  'reading comprehension',
+  'comprehension',
+] as const
+
 export const RELATIVE_OPTION_PHRASES: readonly string[] = [
+  // English Relative Phrases
   'all of the above',
   'none of the above',
   'all the above',
@@ -295,10 +328,14 @@ export const RELATIVE_OPTION_PHRASES: readonly string[] = [
   'both a & b',
   'both b and c',
   'both b & c',
+  'both a and c',
+  'both a & c',
   'a and b only',
   'b and c only',
-  'a and b',
-  'b and c',
+  'a and c only',
+  'neither a nor b',
+  'all the options',
+  'none of the options',
   'options a and b',
   'options b and c',
   'options a & b',
@@ -307,32 +344,65 @@ export const RELATIVE_OPTION_PHRASES: readonly string[] = [
   'b only',
   'c only',
   'd only',
+
+  // French Relative Phrases (Normalized)
+  'toutes les reponses ci-dessus',
+  'toutes les reponses ci dessus',
+  'toutes les propositions ci-dessus',
+  'toutes les options ci-dessus',
+  'tous les elements ci-dessus',
+  'aucune des reponses ci-dessus',
+  'aucune des reponses',
+  'aucune de ces reponses',
+  'aucune des options',
+  'aucun des elements ci-dessus',
+  'les deux a et b',
+  'a et b seulement',
+  'b et c seulement',
+  'a et c seulement',
+  'ni a ni b',
 ] as const
 
-/** Strip punctuation/whitespace and lowercase an option for matching. */
-function normalizeOptionText(opt: string): string {
-  return opt
-    .toLowerCase()
-    .replace(/[^a-z0-9 &]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-/**
- * Returns true if any of the provided options references another option
- * ("All of the above", "Both A and B", etc.). When true, option order
- * must be preserved (no shuffling) for the question to remain valid.
- */
 export function hasRelativeOptions(options: readonly string[] | undefined | null): boolean {
   if (!options || options.length === 0) return false
 
   return options.some((opt) => {
     if (!opt) return false
-    const norm = normalizeOptionText(opt)
+    const norm = stripDiacritics(String(opt))
+      .toLowerCase()
+      .replace(/[^a-z0-9 &]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
     if (!norm) return false
 
     return RELATIVE_OPTION_PHRASES.some(
       (phrase) => norm === phrase || norm.includes(phrase),
+    )
+  })
+}
+
+export function isSubjectExcludedFromShuffle(
+  subjectName?: string | null,
+  examTitle?: string | null
+): boolean {
+  const combined = `${subjectName || ''} ${examTitle || ''}`.trim()
+  if (!combined) return false
+
+  const stripped = stripDiacritics(combined)
+  const normalized = stripped
+    .toLowerCase()
+    .replace(/[._\-\/]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+
+  if (!normalized) return false
+
+  return SHUFFLE_EXCLUDED_SUBJECTS.some((excluded) => {
+    const cleanExcluded = stripDiacritics(excluded).toLowerCase().trim()
+    return (
+      normalized === cleanExcluded ||
+      normalized.split(' ').includes(cleanExcluded) ||
+      normalized.includes(cleanExcluded)
     )
   })
 }

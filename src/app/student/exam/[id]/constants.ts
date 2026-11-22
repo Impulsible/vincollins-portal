@@ -340,7 +340,7 @@ export function isPassingWAECGrade(grade: string): boolean {
  * Checks if a subject is in the excluded list (Languages, Verbal Reasoning, Comprehension).
  * Automatically normalizes diacritics/accents like "Français", "Yorùbá", "Èdè", "Ásụ̀sụ̀ Ị̀gbò".
  */
-export function isSubjectExcludedFromShuffle(subjectName?: string | null): boolean {
+export function isSubjectExcludedFromShuffle(subjectName?: string | null, examTitle?: string | null | undefined): boolean {
   if (!subjectName) return false
 
   // 1. Strip all accents (Français -> Francais, Yorùbá -> Yoruba)

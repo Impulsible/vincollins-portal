@@ -37,9 +37,7 @@ const MAX_UNLOADS = 3;
 
 /**
  * A genuine "security terminated" attempt is one whose status is
- * literally `terminated`. Auto-submits (`is_auto_submitted = true`) are
- * NOT terminations — they're submissions that an admin can revive by
- * granting extra time (which sets status back to `in_progress`).
+ * literally `terminated`.
  */
 function isSecurityTerminated(attempt: {
   status?: string | null;
@@ -62,7 +60,7 @@ function shuffleArray<T>(array: T[]): T[] {
 
 /**
  * Prepares and normalizes questions and options per subject and content rules:
- * - Languages & Reasoning: STRICT LOCK (Questions and Options never shuffle).
+ * - Languages & Reasoning (Yoruba, French, English, etc.): STRICT LOCK (Questions and Options never shuffle).
  * - Maths / Sciences / Others: Full question and option shuffle.
  * - Relative Options ("All/None of the above"): Locks option order for that question.
  */
@@ -70,8 +68,10 @@ function processExamQuestions(
   rawQuestions: Question[],
   subjectName?: string | null,
   examSettings: { shuffle_questions?: boolean; shuffle_options?: boolean } = {},
+  examTitle?: string | null
 ): Question[] {
-  const isExcludedSubject = isSubjectExcludedFromShuffle(subjectName);
+  // Check if subject or title is protected (Yoruba, French, English, etc.)
+  const isExcludedSubject = isSubjectExcludedFromShuffle(subjectName, examTitle);
 
   // Tier 1: Question Shuffling Rule
   const allowQuestionShuffle = isExcludedSubject
@@ -87,6 +87,11 @@ function processExamQuestions(
   let orderedQuestions = [...rawQuestions];
   if (allowQuestionShuffle) {
     orderedQuestions = shuffleArray(orderedQuestions);
+  } else {
+    // Preserve strict original order created by teacher
+    orderedQuestions = orderedQuestions.sort(
+      (a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0)
+    );
   }
 
   // 2. Order Options for each Question
@@ -192,6 +197,9 @@ export function useExamLoader(
 
       const subjectName =
         examData.subject || (examData as any).subject_name || "";
+      const examTitle = examData.title || "";
+
+      // Enforces locked shuffle for Yoruba, French, English across ALL published/existing exams
       const processedQuestions = processExamQuestions(
         normalizedQuestions,
         subjectName,
@@ -202,6 +210,7 @@ export function useExamLoader(
               ? examData.shuffle_options
               : undefined,
         },
+        examTitle
       );
       setAllQuestions(processedQuestions);
 
@@ -209,7 +218,7 @@ export function useExamLoader(
       const theoryMax = theoryCount > 0 ? examData.theory_max || 40 : 0;
       const actualTotalMarks = objectiveMax + theoryMax;
 
-      // 5. Dynamic Duration Resolution (Respects custom duration like 10, 45, 50 mins)
+      // 5. Dynamic Duration Resolution
       const dynamicDuration = resolveExamDuration(examData);
 
       // 6. Attempts
@@ -221,13 +230,11 @@ export function useExamLoader(
       const active = getActiveAttempt(allAttempts);
       const completedCount = completed.length;
 
-      // ✅ PRIORITY 1: If ANY attempt is currently `in_progress`, prefer
-      // resuming over showing a completed/terminated view.
+      // PRIORITY 1: In-progress resume check
       if (active) {
         const latest = active;
         setAttemptsUsed(completedCount);
 
-        // Genuine security termination always wins
         if (isSecurityTerminated(latest)) {
           setHasCompletedAttempt(true);
           setExamTerminated(true);
@@ -244,7 +251,6 @@ export function useExamLoader(
           return;
         }
 
-        // Live attempt → resume flow
         const newUnloadCount = (latest.unload_count || 0) + 1;
 
         if (newUnloadCount >= MAX_UNLOADS) {
@@ -279,7 +285,7 @@ export function useExamLoader(
           attemptId: latest.id,
           answers: latest.answers || {},
           started_at: originalStartedAt,
-          duration: dynamicDuration, // ✅ Dynamic duration without hardcoded fallback
+          duration: dynamicDuration,
           tabSwitches: latest.tab_switches || 0,
           fullscreenExits: latest.fullscreen_exits || 0,
           unloadCount: newUnloadCount,
@@ -290,7 +296,7 @@ export function useExamLoader(
         return;
       }
 
-      // Case A: Max attempts reached (no active attempt)
+      // Case A: Max attempts reached
       if (completedCount >= (examData.max_attempts || 1)) {
         setHasCompletedAttempt(true);
         setAttemptsUsed(completedCount);
@@ -350,7 +356,7 @@ export function useExamLoader(
         }
       }
 
-      // Case C: No attempts
+      // Case C: Fresh attempt
       setAttemptsUsed(0);
       setHasCompletedAttempt(false);
       setAttemptId(null);
