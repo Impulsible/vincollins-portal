@@ -1,4 +1,3 @@
-// components/staff/exams/ExamList.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -50,7 +49,6 @@ import {
   HelpCircle,
   BookOpen,
   Loader2,
-  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -61,6 +59,9 @@ export interface Exam {
   class: string;
   duration?: number;
   duration_minutes?: number;
+  time_limit_minutes?: number;
+  duration_mins?: number;
+  time_limit?: number;
   status: string;
   total_questions: number;
   total_marks: number;
@@ -101,6 +102,22 @@ export interface ExamListProps {
     isCurrent: boolean;
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCURATE DURATION RESOLUTION (Strictly avoids hardcoded fallbacks)
+// ─────────────────────────────────────────────────────────────────────────────
+const getExamDuration = (exam: Exam): number | null => {
+  const e = exam as any;
+  const raw =
+    exam.duration_minutes ??
+    exam.duration ??
+    e.time_limit_minutes ??
+    e.duration_mins ??
+    e.time_limit;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
 
 const getStatusBadge = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -232,7 +249,6 @@ export function ExamList({
     }
   };
 
-  // Stat card configuration with interactive filtering on tap
   const statCards = [
     {
       id: 'all',
@@ -327,7 +343,7 @@ export function ExamList({
         </div>
       )}
 
-      {/* ── Stat Metric Cards (Tappable for Quick Filtering) ─────── */}
+      {/* ── Stat Metric Cards ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
         {statCards.map((card) => {
           const isSelected = statusFilter === card.id;
@@ -364,7 +380,6 @@ export function ExamList({
           />
         </div>
 
-        {/* Filter Pills (Scrollable on small mobile screens) */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto scrollbar-none">
           {[
             { id: 'all', label: 'All' },
@@ -392,7 +407,7 @@ export function ExamList({
         </div>
       </div>
 
-      {/* ── Main Content Area: Cards (Mobile) & Table (Desktop) ──── */}
+      {/* ── Main Content Area ──────────────────────────────────────── */}
       {exams.length === 0 ? (
         <Card className="border border-dashed border-slate-300 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 rounded-2xl">
           <CardContent className="py-14 text-center space-y-3">
@@ -425,7 +440,7 @@ export function ExamList({
           {/* ── Mobile View: High-Density Interactive Cards (< 1024px) ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-3">
             {exams.map((exam) => {
-              const duration = exam.duration_minutes || exam.duration || 60;
+              const duration = getExamDuration(exam);
               const isDraft = exam.status === 'draft';
               const isApproved = exam.status === 'approved';
               const isPublished = exam.status === 'published';
@@ -436,7 +451,6 @@ export function ExamList({
                   key={exam.id}
                   className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between"
                 >
-                  {/* Card Header */}
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -459,7 +473,7 @@ export function ExamList({
                   <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-[11px] text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{duration} mins</span>
+                      <span>{duration ? `${duration} mins` : 'Untimed'}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -478,7 +492,6 @@ export function ExamList({
                     </span>
 
                     <div className="flex items-center gap-1">
-                      {/* Contextual Primary Action */}
                       {isDraft && (
                         <Button
                           size="sm"
@@ -508,7 +521,6 @@ export function ExamList({
                         </Button>
                       )}
 
-                      {/* Edit / View Quick Action */}
                       {isDraft ? (
                         <Button
                           size="sm"
@@ -529,7 +541,6 @@ export function ExamList({
                         </Button>
                       )}
 
-                      {/* Dropdown Menu */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -603,7 +614,7 @@ export function ExamList({
 
               <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs text-slate-700 dark:text-slate-300">
                 {exams.map((exam) => {
-                  const duration = exam.duration_minutes || exam.duration || 60;
+                  const duration = getExamDuration(exam);
                   const isDraft = exam.status === 'draft';
                   const isApproved = exam.status === 'approved';
                   const isPublished = exam.status === 'published';
@@ -644,7 +655,7 @@ export function ExamList({
                       <TableCell className="py-3 px-4 text-center">
                         <div className="inline-flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{duration}m</span>
+                          <span>{duration ? `${duration}m` : 'Untimed'}</span>
                         </div>
                       </TableCell>
 
@@ -658,7 +669,6 @@ export function ExamList({
 
                       <TableCell className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Contextual Actions */}
                           {isDraft && (
                             <Button
                               size="sm"
