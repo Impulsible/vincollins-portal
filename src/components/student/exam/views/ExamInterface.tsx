@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, type ComponentProps } from "react";
+import { useState, useEffect, useMemo, useCallback, type ComponentProps } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -533,6 +533,42 @@ export function ExamInterface({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [passageExpanded, setPassageExpanded] = useState(true);
 
+  // ── Persistence Key for Reading Passage ──
+  const passageStorageKey = useMemo(() => {
+    return `cbt_passage_expanded_${exam?.id || 'default'}`;
+  }, [exam?.id]);
+
+  // Load manual minimize/expand preference from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem(passageStorageKey);
+      if (stored !== null) {
+        setPassageExpanded(JSON.parse(stored) === true);
+      } else {
+        // Defaults to expanded if student never manually changed it
+        setPassageExpanded(true);
+      }
+    } catch {
+      setPassageExpanded(true);
+    }
+  }, [passageStorageKey]);
+
+  // Handle manual toggle and persist to localStorage
+  const handleTogglePassage = useCallback(() => {
+    setPassageExpanded((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(passageStorageKey, JSON.stringify(next));
+        } catch (err) {
+          console.warn("Could not persist passage state to localStorage:", err);
+        }
+      }
+      return next;
+    });
+  }, [passageStorageKey]);
+
   const currentQuestion = allQuestions[currentIndex];
   const isFlagged = currentQuestion
     ? flaggedQuestions.has(currentQuestion.id)
@@ -738,7 +774,7 @@ export function ExamInterface({
         <ReadingPassageDock
           passageText={passageText}
           isExpanded={passageExpanded}
-          onToggle={() => setPassageExpanded((prev) => !prev)}
+          onToggle={handleTogglePassage}
         />
       )}
 
