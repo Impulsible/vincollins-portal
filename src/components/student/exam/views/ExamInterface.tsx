@@ -1,7 +1,6 @@
-// src/components/student/exam/views/ExamInterface.tsx
 "use client";
 
-import { useState, useEffect, type ComponentProps } from "react";
+import { useState, useEffect, useMemo, type ComponentProps } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -29,6 +28,8 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Flag,
   Layers,
   FileText,
@@ -36,6 +37,8 @@ import {
   Sparkles,
   Circle,
   Image as ImageIcon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
@@ -59,6 +62,138 @@ const removeMarksFromText = (text: string): string => {
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// COLLAPSIBLE READING PASSAGE DOCK
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReadingPassageDock({
+  passageText,
+  isExpanded,
+  onToggle,
+}: {
+  passageText: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const wordCount = useMemo(() => {
+    return passageText.trim().split(/\s+/).filter(Boolean).length;
+  }, [passageText]);
+
+  const readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 180));
+
+  // Extract brief snippet for collapsed preview
+  const snippet = useMemo(() => {
+    const clean = passageText.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ");
+    return clean.length > 120 ? `${clean.slice(0, 120)}…` : clean;
+  }, [passageText]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5">
+      <div className="relative overflow-hidden rounded-3xl border border-amber-200/80 dark:border-amber-800/60 bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-yellow-50/80 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-yellow-950/30 shadow-sm transition-all duration-300">
+        <div className="absolute -top-16 -right-16 h-40 w-40 bg-orange-300/30 dark:bg-orange-800/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-amber-300/30 dark:bg-amber-800/20 rounded-full blur-3xl pointer-events-none" />
+
+        {/* ── PASSAGE HEADER (Always Visible & Clickable) ── */}
+        <div
+          onClick={onToggle}
+          className="relative px-5 py-3.5 sm:px-6 flex items-center justify-between cursor-pointer select-none hover:bg-amber-100/40 dark:hover:bg-amber-950/50 transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-500/30 shrink-0">
+              <BookOpen className="h-4.5 w-4.5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-[0.14em]">
+                  Reading Passage / Reference Material
+                </span>
+                <Badge
+                  variant="outline"
+                  className="hidden xs:inline-flex bg-amber-100/80 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700 text-[10px] py-0 px-1.5 h-4 font-semibold"
+                >
+                  ~{readingTimeMinutes} min read ({wordCount} words)
+                </Badge>
+              </div>
+
+              {!isExpanded ? (
+                <p className="text-xs text-amber-900/70 dark:text-amber-200/70 truncate max-w-[280px] sm:max-w-md lg:max-w-2xl font-medium mt-0.5">
+                  <span className="font-semibold text-amber-950 dark:text-amber-100">
+                    Preview:
+                  </span>{" "}
+                  {snippet}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-900/80 dark:text-amber-300/80 font-medium mt-0.5 hidden sm:block">
+                  Read the reference passage carefully to answer the associated questions
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              className="h-8 px-3 rounded-xl border-amber-300 dark:border-amber-700 bg-white/80 dark:bg-slate-900/80 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-xs font-bold gap-1.5 shadow-sm"
+            >
+              {isExpanded ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="hidden sm:inline">Minimize</span>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="hidden sm:inline">View Passage</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* ── EXPANDABLE PASSAGE CONTENT ── */}
+        <AnimatePresence initial={false}>
+          {isExpanded && (
+            <motion.div
+              key="passage-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.28, ease: "easeInOut" }}
+              className="overflow-hidden border-t border-amber-200/60 dark:border-amber-900/40"
+            >
+              <div className="p-4 sm:p-6 pt-3 sm:pt-4">
+                <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-amber-200/60 dark:border-amber-900/40 shadow-inner max-h-[380px] overflow-y-auto custom-scrollbar">
+                  <QuestionContent text={passageText} />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-amber-800/70 dark:text-amber-400/70 px-1">
+                  <span>
+                    💡 Tip: Click <strong>Minimize</strong> when done reading to focus on questions.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onToggle}
+                    className="hover:underline font-semibold cursor-pointer"
+                  >
+                    Hide Passage ↑
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // OBJECTIVE QUESTION CARD (WITH TABLE & DIAGRAM SUPPORT)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -78,7 +213,7 @@ function ObjectiveQuestionCard({
   const rawQuestionText = question?.question || question?.question_text || "";
   const cleanedText = removeMarksFromText(rawQuestionText);
   const options: string[] = (question?.options || []).filter(Boolean);
-  
+
   const imageUrl = question?.image_url || (question as any)?.imageUrl;
   const imageCaption = question?.image_caption || (question as any)?.imageCaption;
 
@@ -328,7 +463,9 @@ function QuestionCounter({
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100/70 dark:bg-slate-800/70 ring-1 ring-slate-200 dark:ring-slate-700">
       <BookOpen className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
       <span className="text-xs tabular-nums">
-        <span className="font-bold text-slate-900 dark:text-slate-100">{currentIndex + 1}</span>
+        <span className="font-bold text-slate-900 dark:text-slate-100">
+          {currentIndex + 1}
+        </span>
         <span className="text-slate-400 dark:text-slate-500 mx-1">/</span>
         <span className="text-slate-600 dark:text-slate-400">{total}</span>
       </span>
@@ -394,6 +531,7 @@ export function ExamInterface({
   onSubmit,
 }: ExamInterfaceProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [passageExpanded, setPassageExpanded] = useState(true);
 
   const currentQuestion = allQuestions[currentIndex];
   const isFlagged = currentQuestion
@@ -522,7 +660,9 @@ export function ExamInterface({
                 </h1>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate hidden sm:block mt-0.5">
                   <span className="font-medium">{studentName}</span>
-                  <span className="text-slate-300 dark:text-slate-600 mx-1.5">·</span>
+                  <span className="text-slate-300 dark:text-slate-600 mx-1.5">
+                    ·
+                  </span>
                   {examSubject}
                 </p>
               </div>
@@ -557,7 +697,8 @@ export function ExamInterface({
                 <Flag
                   className={cn(
                     "h-4 w-4",
-                    isFlagged && "fill-amber-500 text-amber-600 dark:text-amber-400",
+                    isFlagged &&
+                      "fill-amber-500 text-amber-600 dark:text-amber-400",
                   )}
                 />
                 <span className="hidden sm:inline text-xs font-semibold">
@@ -592,32 +733,13 @@ export function ExamInterface({
         </div>
       </header>
 
-      {/* ── COMPREHENSION READING PASSAGE (WITH TABLE & DIAGRAM SUPPORT) ───── */}
+      {/* ── COLLAPSIBLE COMPREHENSION READING PASSAGE ─────────────────────── */}
       {passageText && (
-        <div className="max-w-7xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5">
-          <div className="relative overflow-hidden rounded-3xl border border-amber-200/70 dark:border-amber-800/50 bg-gradient-to-br from-amber-50 via-orange-50/50 to-yellow-50 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-yellow-950/20 shadow-sm">
-            <div className="absolute -top-16 -right-16 h-40 w-40 bg-orange-200/40 dark:bg-orange-900/30 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-amber-200/40 dark:bg-amber-900/30 rounded-full blur-3xl pointer-events-none" />
-            <div className="relative p-5 sm:p-6">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-500/30">
-                  <BookOpen className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-[0.14em]">
-                    Reading Passage / Case Study
-                  </div>
-                  <div className="text-xs text-amber-900/80 dark:text-amber-300/80 font-medium">
-                    Read the reference material carefully before answering
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-amber-200/60 dark:border-amber-900/40">
-                <QuestionContent text={passageText} />
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReadingPassageDock
+          passageText={passageText}
+          isExpanded={passageExpanded}
+          onToggle={() => setPassageExpanded((prev) => !prev)}
+        />
       )}
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}

@@ -18,7 +18,7 @@ import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
 
-// ✅ Flexible term matcher - handles 'third' vs 'Third Term' vs '3rd Term'
+// Flexible term matcher - handles 'third' vs 'Third Term' vs '3rd Term'
 const isTermMatch = (term1?: string, term2?: string) => {
   if (!term1 || !term2) return false
   const t1 = term1.toLowerCase().trim()
@@ -30,7 +30,7 @@ const isTermMatch = (term1?: string, term2?: string) => {
   return false
 }
 
-// ✅ Extract year from class name
+// Extract year from class name
 const extractYear = (className: string): string => {
   if (!className) return ''
   const normalized = className.trim().toUpperCase().replace(/\s/g, '')
@@ -49,7 +49,7 @@ const extractYear = (className: string): string => {
   return className
 }
 
-// ✅ Get subject count based on class level (JSS = 17, SS = 10)
+// Get subject count based on class level (JSS = 17, SS = 10)
 const getSubjectCountByClassLevel = (className: string): number => {
   if (!className) return 0
   const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
@@ -58,32 +58,36 @@ const getSubjectCountByClassLevel = (className: string): number => {
   return 0
 }
 
-// ✅ WAEC Grade Calculator
-const getWAECGrade = (p: number): string => {
-  const percentage = Number(p) || 0
-  if (percentage >= 75) return 'A1'
-  if (percentage >= 70) return 'B2'
-  if (percentage >= 65) return 'B3'
-  if (percentage >= 60) return 'C4'
-  if (percentage >= 55) return 'C5'
-  if (percentage >= 50) return 'C6'
-  if (percentage >= 45) return 'D7'
-  if (percentage >= 40) return 'E8'
-  return 'F9'
+/**
+ * Standard 5-Point School Grade Scale:
+ * 80 - 100 => A
+ * 70 - 79  => B
+ * 60 - 69  => C
+ * 50 - 59  => P
+ * 0  - 49  => F
+ */
+export const getSchoolGrade = (p: number): string => {
+  const percentage = Math.round(Number(p) || 0)
+  if (percentage >= 80) return 'A'
+  if (percentage >= 70) return 'B'
+  if (percentage >= 60) return 'C'
+  if (percentage >= 50) return 'P'
+  return 'F'
 }
 
-// ✅ Grade color mapping
-const getGradeColor = (grade: string): string => {
+// Grade color mapping
+export const getGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A1': case 'B2': case 'B3': return 'text-emerald-600'
-    case 'C4': case 'C5': case 'C6': return 'text-blue-600'
-    case 'D7': case 'E8': return 'text-amber-600'
-    case 'F9': return 'text-red-600'
-    default: return 'text-gray-600'
+    case 'A': return 'text-emerald-600'
+    case 'B': return 'text-blue-600'
+    case 'C': return 'text-indigo-600'
+    case 'P': return 'text-amber-600'
+    case 'F': return 'text-red-600'
+    default: return 'text-gray-400'
   }
 }
 
-// ✅ Get current term from database
+// Get current term from database
 async function fetchCurrentTermFromDB(): Promise<{ term: string; session: string } | null> {
   try {
     const { data: termData, error: termError } = await supabase
@@ -138,19 +142,17 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   const isFetching = useRef(false)
   const [currentTerm, setCurrentTerm] = useState({ term: "", session: "" })
 
-  // ✅ Load current term from database
   useEffect(() => {
     const loadCurrentTerm = async () => {
       const termData = await fetchCurrentTermFromDB()
       if (termData) {
         setCurrentTerm(termData)
-        console.log('📊 Current term from DB:', termData)
       }
     }
     loadCurrentTerm()
   }, [])
 
-  // ✅ Build subject stats
+  // Build subject stats with 80/70/60/50/49 scale
   const buildSubjectStats = useCallback((examsData: Exam[], attemptsMap: Record<string, ExamAttempt>): SubjectStat[] => {
     const subjectMap = new Map<string, { scores: number[], status: 'completed' | 'pending' | 'not_started' }>()
     
@@ -174,12 +176,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         ? Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length) 
         : 0
       
-      let grade = 'N/A'
-      if (avgScore >= 75) grade = 'A'
-      else if (avgScore >= 65) grade = 'B'
-      else if (avgScore >= 50) grade = 'C'
-      else if (avgScore >= 40) grade = 'P'
-      else if (avgScore > 0) grade = 'F'
+      const grade = data.scores.length > 0 ? getSchoolGrade(avgScore) : 'N/A'
       
       return {
         subject,
@@ -191,18 +188,12 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   }, [])
 
   const loadData = useCallback(async (term?: string, session?: string) => {
-    if (isFetching.current) {
-      console.log('⏳ Already fetching, skipping...')
-      return
-    }
+    if (isFetching.current) return
 
     const targetTerm = term || selectedTermSession?.term || currentTerm.term
     const targetSession = session || selectedTermSession?.session_year || currentTerm.session
 
-    if (!targetTerm || !targetSession) {
-      console.log('⏳ Waiting for term to load...')
-      return
-    }
+    if (!targetTerm || !targetSession) return
 
     isFetching.current = true
     setLoading(true)
@@ -222,14 +213,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         .eq("id", user.id)
         .maybeSingle()
       
-      if (profileError || !profileData) { 
-        toast.error("Profile not found")
-        setLoading(false)
-        isFetching.current = false
-        return 
-      }
-      
-      if (profileData.role !== "student") { 
+      if (profileError || !profileData || profileData.role !== "student") { 
         router.push("/portal")
         setLoading(false)
         isFetching.current = false
@@ -256,9 +240,8 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       }
 
       const isCurrentTerm = isTermMatch(targetTerm, currentTerm.term) && targetSession === currentTerm.session
-      console.log('🎯 Target term:', { targetTerm, targetSession, isCurrentTerm })
 
-      // ✅ Load available terms (only once)
+      // Load available terms (only once)
       if (!hasLoaded.current && sp.id) {
         hasLoaded.current = true
         try {
@@ -310,7 +293,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
             }
           })
           
-          // Also populate dropdown from report_cards (so previous terms show up)
           const { data: reportCardTerms } = await supabase
             .from("report_cards")
             .select("term, academic_year, session_year, class")
@@ -377,27 +359,19 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         }
       }
 
-      // ✅ Fetch Online Exam Attempts
-      const { data: attemptsData, error: attemptsError } = await supabase
+      // Fetch Online Exam Attempts
+      const { data: attemptsData } = await supabase
         .from("exam_attempts")
         .select("*")
         .eq("student_id", sp.id)
-      
-      if (attemptsError) {
-        console.error("Error fetching attempts:", attemptsError)
-      }
 
-      // ✅ Fetch Online Exams
-      const { data: examsData, error: examsError } = await supabase
+      // Fetch Online Exams
+      const { data: examsData } = await supabase
         .from("exams")
         .select("*")
         .eq("status", "published")
         .eq("session_year", targetSession)
         .order("created_at", { ascending: false })
-
-      if (examsError) {
-        console.error("Error fetching exams:", examsError)
-      }
 
       const examDefMap: Record<string, any> = {}
       ;(examsData || []).forEach((e: any) => { examDefMap[e.id] = e })
@@ -422,7 +396,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         return hasAttempt
       })
 
-      // ✅ Fetch CA Scores
+      // Fetch CA Scores
       const { data: caScoresData } = await supabase
         .from("ca_scores")
         .select("*")
@@ -438,7 +412,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           if (ca.exam_id) caMap[ca.exam_id] = ca 
         })
 
-      // ✅ Process Online CBT Attempts
+      // Process Online CBT Attempts
       const am: Record<string, ExamAttempt> = {}
       const attemptsForTerm = attemptsData?.filter((a: any) => 
         isTermMatch(a.term, targetTerm) && 
@@ -507,13 +481,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           ca_percentage: hasCA ? Math.round((caTotal / 40) * 100) : 0,
           hasCA,
           has_ca: hasCA,
-          grade: getWAECGrade(percentage),
-          is_passed: percentage >= 40,
+          grade: getSchoolGrade(percentage),
+          is_passed: percentage >= 50,
         }
         am[a.exam_id] = attemptObj as ExamAttempt
       })
 
-      // ✅ FALLBACK: Fetch Report Cards for offline/uploaded subjects
+      // Fallback: Fetch Report Cards for offline/uploaded subjects
       const { data: reportCards } = await supabase
         .from('report_cards')
         .select('*')
@@ -555,7 +529,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
               question_count: 0,
               num_questions: 0,
               total_marks: 100,
-              passing_percentage: 40,
+              passing_percentage: 50,
               objective_max: 60,
               theory_max: 0,
               exam_type: 'offline',
@@ -590,8 +564,8 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
               ca_percentage: Math.round((caScore / 40) * 100),
               hasCA: true,
               has_ca: true,
-              grade: subj.grade || getWAECGrade(total),
-              is_passed: total >= 40,
+              grade: subj.grade || getSchoolGrade(total),
+              is_passed: total >= 50,
             } as any
           })
         }
@@ -600,7 +574,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       setExams(filteredExams)
       setExamAttempts(am)
 
-      // ✅ FIX: Calculate stats directly from actual CBT attempts, NOT termProgressData
+      // Calculate stats directly from actual CBT attempts
       const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory')
       const pendingTheoryCount = pendingTheoryAttempts.length
       const subjectStats = buildSubjectStats(filteredExams, am)
@@ -615,7 +589,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         ? Math.round(cbtAttempts.reduce((acc, a) => acc + (a.percentage || 0), 0) / cbtAttempts.length) 
         : 0
         
-      const dbGrade = getWAECGrade(dbAverageScore)
+      const dbGrade = cbtAttempts.length > 0 ? getSchoolGrade(dbAverageScore) : 'N/A'
 
       const availableCount = filteredExams.filter((e: any) => {
         const a = am[e.id]
@@ -629,10 +603,10 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
 
       const newStats: LocalStatsState = {
         available: availableCount,
-        completed: completedCount,      // ✅ Now strictly 0 for Ebube
+        completed: completedCount,
         upcoming: upcomingCount,
-        averageScore: dbAverageScore,   // ✅ Now strictly 0% for Ebube
-        currentGrade: dbGrade,          // ✅ Now correctly F9 or N/A
+        averageScore: dbAverageScore,
+        currentGrade: dbGrade,
         gradeColor: getGradeColor(dbGrade),
         totalSubjects: totalSubjects,
         termName: TERM_NAMES[targetTerm as keyof typeof TERM_NAMES] || targetTerm,
@@ -641,7 +615,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         subjectStats: subjectStats,
       }
 
-      console.log('📊 Stats:', newStats)
       setStats(newStats)
 
     } catch (e) { 

@@ -1,4 +1,3 @@
-// src/components/student/exams/TermProgressCard.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -6,7 +5,7 @@ import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Award, RefreshCw, TrendingUp, CheckCircle2, Calendar, Calculator } from 'lucide-react'
+import { Award, RefreshCw, CheckCircle2, Calendar, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StatsState, TermOption, TermSession } from '@/app/student/types'
 
@@ -21,12 +20,13 @@ interface TermProgressCardProps {
   isLoading?: boolean
 }
 
+// 5-Point Grade Style Palette (A, B, C, P, F)
 const getGradeStyle = (grade: string) => {
   switch (grade) {
     case 'A': return { bg: 'bg-emerald-500', soft: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' }
     case 'B': return { bg: 'bg-blue-500',    soft: 'bg-blue-50 dark:bg-blue-950/40',    text: 'text-blue-700 dark:text-blue-300',    border: 'border-blue-200 dark:border-blue-800' }
-    case 'C': return { bg: 'bg-amber-500',   soft: 'bg-amber-50 dark:bg-amber-950/40',   text: 'text-amber-700 dark:text-amber-300',   border: 'border-amber-200 dark:border-amber-800' }
-    case 'P': return { bg: 'bg-orange-500',  soft: 'bg-orange-50 dark:bg-orange-950/40',  text: 'text-orange-700 dark:text-orange-300',  border: 'border-orange-200 dark:border-orange-800' }
+    case 'C': return { bg: 'bg-indigo-500',  soft: 'bg-indigo-50 dark:bg-indigo-950/40',  text: 'text-indigo-700 dark:text-indigo-300',  border: 'border-indigo-200 dark:border-indigo-800' }
+    case 'P': return { bg: 'bg-amber-500',   soft: 'bg-amber-50 dark:bg-amber-950/40',   text: 'text-amber-700 dark:text-amber-300',   border: 'border-amber-200 dark:border-amber-800' }
     case 'F': return { bg: 'bg-red-500',     soft: 'bg-red-50 dark:bg-red-950/40',     text: 'text-red-700 dark:text-red-300',     border: 'border-red-200 dark:border-red-800' }
     default:  return { bg: 'bg-slate-400',   soft: 'bg-slate-50 dark:bg-slate-800/60',   text: 'text-slate-600 dark:text-slate-300',   border: 'border-slate-200 dark:border-slate-700' }
   }
@@ -37,7 +37,12 @@ export function TermProgressCard({
   studentClass, studentDepartment, isLoading = false
 }: TermProgressCardProps) {
   const completionPct = stats.totalSubjects > 0 ? Math.round((stats.completed / stats.totalSubjects) * 100) : 0
-  const displayGrade = stats.completed > 0 && stats.currentGrade && stats.currentGrade !== 'N/A' ? stats.currentGrade : null
+  
+  // Show grade if at least 1 exam is completed and grade is not 'N/A'
+  const displayGrade = stats.completed > 0 && stats.currentGrade && stats.currentGrade !== 'N/A' 
+    ? stats.currentGrade 
+    : null
+
   const gradeStyle = displayGrade ? getGradeStyle(displayGrade) : getGradeStyle('')
   const [isInitialized, setIsInitialized] = useState(false)
 
@@ -133,12 +138,13 @@ export function TermProgressCard({
                   {stats.completed}/{stats.totalSubjects} done
                 </div>
                 
-                {/* 🛠️ THE AVERAGE SCORE BADGE */}
+                {/* 🛠️ AVERAGE SCORE BADGE */}
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
                   <Calculator className="h-3.5 w-3.5 text-teal-500" />
                   {stats.averageScore}% avg (CA+Exam)
                 </div>
 
+                {/* 🛠️ SCHOOL GRADE BADGE: A, B, C, P, F */}
                 {displayGrade && (
                   <div className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold border', gradeStyle.soft, gradeStyle.text, gradeStyle.border)}>
                     <Award className="h-3.5 w-3.5" />
