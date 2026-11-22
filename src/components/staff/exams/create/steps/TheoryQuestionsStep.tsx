@@ -71,6 +71,7 @@ const uploadImage = async (file: File): Promise<{ url: string; isFallback: boole
 };
 
 const EXAM_TOTAL = 60;
+const DEFAULT_QUESTION_MARKS = 10;
 
 /* ─── Types ─── */
 
@@ -99,7 +100,7 @@ export function TheoryQuestionsStep({
 }: TheoryQuestionsStepProps) {
   const [manualQ, setManualQ] = useState({
     question: "",
-    marks: 10,
+    marks: DEFAULT_QUESTION_MARKS,
     image_url: "",
     image_caption: "",
   });
@@ -131,14 +132,12 @@ export function TheoryQuestionsStep({
   const theoryTotal = useMemo(() => {
     if (totalQ === 0) return 0;
     const sorted = [...questions].sort((a, b) => b.marks - a.marks);
-    return sorted.slice(0, effectiveN).reduce((s, q) => s + q.marks, 0);
+    return sorted.slice(0, effectiveN).reduce((s, q) => s + (Number(q.marks) || 0), 0);
   }, [questions, effectiveN, totalQ]);
 
   const grandTotal = objectiveTotal + theoryTotal;
   const isBalanced = grandTotal === EXAM_TOTAL;
   const isOver = grandTotal > EXAM_TOTAL;
-  const allMarksEqual =
-    totalQ > 0 && questions.every((q) => q.marks === questions[0].marks);
 
   /* ── Textarea Formatting Tools ── */
 
@@ -237,15 +236,17 @@ export function TheoryQuestionsStep({
       return;
     }
 
+    const currentMark = Number(manualQ.marks) || DEFAULT_QUESTION_MARKS;
+
     if (editingQuestionId) {
-      // Update existing
+      // Update existing question
       onQuestionsChange(
         questions.map((q) =>
           q.id === editingQuestionId
             ? {
                 ...q,
                 question: manualQ.question.trim(),
-                marks: manualQ.marks,
+                marks: currentMark,
                 image_url: manualQ.image_url || undefined,
                 image_caption: manualQ.image_caption || undefined,
               }
@@ -255,13 +256,13 @@ export function TheoryQuestionsStep({
       setEditingQuestionId(null);
       toast.success("Theory question updated");
     } else {
-      // Add new
+      // Add new question
       onQuestionsChange([
         ...questions,
         {
           id: crypto.randomUUID(),
           question: manualQ.question.trim(),
-          marks: manualQ.marks,
+          marks: currentMark,
           image_url: manualQ.image_url || undefined,
           image_caption: manualQ.image_caption || undefined,
         },
@@ -269,13 +270,15 @@ export function TheoryQuestionsStep({
       toast.success("Theory question added");
     }
 
+    // FIXED: Keep marks stable at whatever value the user was using, or standard default (10)
+    // NEVER dynamically overwrite marks to 30!
     setManualQ({
       question: "",
-      marks: Math.max(1, theoryRemaining > 0 && totalQ === 0 ? theoryRemaining : 10),
+      marks: currentMark,
       image_url: "",
       image_caption: "",
     });
-  }, [manualQ, editingQuestionId, questions, onQuestionsChange, theoryRemaining, totalQ]);
+  }, [manualQ, editingQuestionId, questions, onQuestionsChange]);
 
   const handleStartEdit = (q: TheoryQuestion) => {
     setEditingQuestionId(q.id);
@@ -295,7 +298,7 @@ export function TheoryQuestionsStep({
     setEditingQuestionId(null);
     setManualQ({
       question: "",
-      marks: 10,
+      marks: DEFAULT_QUESTION_MARKS,
       image_url: "",
       image_caption: "",
     });
@@ -332,7 +335,7 @@ export function TheoryQuestionsStep({
         marks: splitMarks,
       }))
     );
-    toast.success(`Marks balanced to ${splitMarks} each (${splitMarks * effectiveN} total)`);
+    toast.success(`Marks balanced to ${splitMarks} each (${(splitMarks * effectiveN).toFixed(1)} total)`);
   };
 
   const startEditMark = (q: TheoryQuestion) => {
