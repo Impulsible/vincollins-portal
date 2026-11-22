@@ -218,7 +218,11 @@ export default function StaffExamsPage() {
 
         {/* Assessment Management Suite */}
         <ExamList
-          exams={filteredExams}
+          exams={filteredExams.map((exam) => ({
+            ...exam,
+            duration: exam.duration ?? undefined,
+            duration_minutes: exam.duration_minutes ?? undefined,
+          }))}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           statusFilter={statusFilter}

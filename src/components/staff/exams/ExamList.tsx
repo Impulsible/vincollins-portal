@@ -51,6 +51,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { resolveExamDuration } from '@/app/staff/exams/hooks/useExams';
 
 export interface Exam {
   id: string;
@@ -59,9 +60,9 @@ export interface Exam {
   class: string;
   duration?: number;
   duration_minutes?: number;
-  time_limit_minutes?: number;
-  duration_mins?: number;
   time_limit?: number;
+  settings?: any;
+  exam_data?: any;
   status: string;
   total_questions: number;
   total_marks: number;
@@ -102,22 +103,6 @@ export interface ExamListProps {
     isCurrent: boolean;
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ACCURATE DURATION RESOLUTION (Strictly avoids hardcoded fallbacks)
-// ─────────────────────────────────────────────────────────────────────────────
-const getExamDuration = (exam: Exam): number | null => {
-  const e = exam as any;
-  const raw =
-    exam.duration_minutes ??
-    exam.duration ??
-    e.time_limit_minutes ??
-    e.duration_mins ??
-    e.time_limit;
-
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-};
 
 const getStatusBadge = (status: string) => {
   switch (status?.toLowerCase()) {
@@ -440,7 +425,8 @@ export function ExamList({
           {/* ── Mobile View: High-Density Interactive Cards (< 1024px) ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-3">
             {exams.map((exam) => {
-              const duration = getExamDuration(exam);
+              // Guaranteed accurate duration calculation
+              const duration = resolveExamDuration(exam);
               const isDraft = exam.status === 'draft';
               const isApproved = exam.status === 'approved';
               const isPublished = exam.status === 'published';
@@ -451,6 +437,7 @@ export function ExamList({
                   key={exam.id}
                   className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3 flex flex-col justify-between"
                 >
+                  {/* Card Header */}
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -472,8 +459,8 @@ export function ExamList({
                   {/* Metadata Matrix */}
                   <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-[11px] text-slate-600 dark:text-slate-400 border border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{duration ? `${duration} mins` : 'Untimed'}</span>
+                      <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{duration} mins</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -597,7 +584,7 @@ export function ExamList({
             })}
           </div>
 
-          {/* ── Desktop View: Professional Clean Table (>= 1024px) ── */}
+          {/* ── Desktop View: Table (>= 1024px) ───────────────────────── */}
           <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
             <Table>
               <TableHeader>
@@ -614,7 +601,8 @@ export function ExamList({
 
               <TableBody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs text-slate-700 dark:text-slate-300">
                 {exams.map((exam) => {
-                  const duration = getExamDuration(exam);
+                  // Guaranteed accurate duration calculation
+                  const duration = resolveExamDuration(exam);
                   const isDraft = exam.status === 'draft';
                   const isApproved = exam.status === 'approved';
                   const isPublished = exam.status === 'published';
@@ -653,9 +641,9 @@ export function ExamList({
                       </TableCell>
 
                       <TableCell className="py-3 px-4 text-center">
-                        <div className="inline-flex items-center gap-1 font-medium text-slate-800 dark:text-slate-200">
-                          <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{duration ? `${duration}m` : 'Untimed'}</span>
+                        <div className="inline-flex items-center gap-1 font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-md border border-blue-100 dark:border-blue-900">
+                          <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          <span>{duration}m</span>
                         </div>
                       </TableCell>
 

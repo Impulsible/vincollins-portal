@@ -1,5 +1,3 @@
-// app/staff/exams/hooks/useExams.ts
-
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -12,6 +10,10 @@ export interface Exam {
   subject: string
   class: string
   duration: number
+  duration_minutes?: number
+  time_limit?: number
+  settings?: any
+  exam_data?: any
   status: string
   total_questions: number
   total_marks: number
@@ -28,6 +30,64 @@ export interface Exam {
   session_year?: string
 }
 
+/**
+ * Universal duration resolver:
+ * Safely resolves the configured duration in minutes.
+ * Scans for any custom duration (e.g., 90, 120) before falling back to 60.
+ */
+export function resolveExamDuration(exam: any): number {
+  if (!exam) return 60
+
+  const parseJson = (val: any) => {
+    if (!val) return {}
+    if (typeof val === 'object') return val
+    try {
+      return JSON.parse(val)
+    } catch {
+      return {}
+    }
+  }
+
+  const settings = parseJson(exam.settings)
+  const examData = parseJson(exam.exam_data)
+
+  const candidates = [
+    exam.duration,
+    exam.duration_minutes,
+    exam.time_limit,
+    settings.duration,
+    settings.time_limit,
+    settings.timeLimit,
+    settings.duration_minutes,
+    examData.duration,
+    examData.time_limit,
+    examData.timeLimit,
+    examData.duration_minutes,
+  ]
+
+  // 1. Look for any valid custom time (non-60)
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null && candidate !== '') {
+      const parsed = Number(candidate)
+      if (Number.isFinite(parsed) && parsed > 0 && parsed !== 60) {
+        return Math.round(parsed)
+      }
+    }
+  }
+
+  // 2. If no non-60 custom time is found, look for any valid 60
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null && candidate !== '') {
+      const parsed = Number(candidate)
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Math.round(parsed)
+      }
+    }
+  }
+
+  return 60
+}
+
 export function useExams(
   teacherId?: string,
   termCode?: string,
@@ -42,7 +102,9 @@ export function useExams(
   const aliveRef = useRef(true)
   useEffect(() => {
     aliveRef.current = true
-    return () => { aliveRef.current = false }
+    return () => {
+      aliveRef.current = false
+    }
   }, [])
 
   /* ── Load ───────────────────────────────────────────────── */
@@ -60,7 +122,7 @@ export function useExams(
         .from('exams')
         .select('*')
         .eq('created_by', teacherId)
-        .is('deleted_at', null) // Only load exams that haven't been soft-deleted
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
 
       if (termCode && sessionYear) {
@@ -73,7 +135,14 @@ export function useExams(
       if (error) throw error
 
       if (!aliveRef.current) return
-      setExams((data || []) as Exam[])
+
+      // Map rows ensuring duration is parsed accurately
+      const normalizedData = (data || []).map((exam: any) => ({
+        ...exam,
+        duration: resolveExamDuration(exam),
+      }))
+
+      setExams(normalizedData as Exam[])
     } catch (error: any) {
       console.error('Error loading exams:', error)
       toast.error(`Failed to load exams: ${error?.message ?? 'unknown'}`)
@@ -82,11 +151,9 @@ export function useExams(
     }
   }, [teacherId, termCode, sessionYear])
 
-  // Single source of truth for fetching — fires when the filter inputs change.
   useEffect(() => {
     loadExams()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacherId, termCode, sessionYear])
+  }, [teacherId, termCode, sessionYear, loadExams])
 
   /* ── Derived (search + status) ──────────────────────────── */
 
@@ -113,8 +180,6 @@ export function useExams(
 
   const handleDeleteExam = useCallback(async (examId: string) => {
     try {
-      // SOFT DELETE: Mark as deleted instead of permanently destroying the row.
-      // This avoids foreign key restriction errors entirely and keeps data recoverable.
       const { data, error } = await supabase
         .from('exams')
         .update({ deleted_at: new Date().toISOString() })
@@ -127,12 +192,10 @@ export function useExams(
       }
 
       if (!data || data.length === 0) {
-        toast.error('Delete failed — the exam may be missing, or RLS is blocking the update.')
+        toast.error('Delete failed — the exam may be missing or blocked by permissions.')
         throw new Error('No rows updated')
       }
 
-      // Optimistic local update so the row disappears immediately,
-      // then re-sync with the server to be authoritative.
       setExams((prev) => prev.filter((e) => e.id !== examId))
       toast.success('Exam deleted successfully')
       await loadExams()
@@ -152,14 +215,16 @@ export function useExams(
         return
       }
 
-      // 1) Clone the exam row (without identity / timestamps)
+      const trueDuration = resolveExamDuration(exam)
+
+      // 1) Clone the exam row
       const { data: newExam, error: examErr } = await supabase
         .from('exams')
         .insert({
           title: `${exam.title} (Copy)`,
           subject: exam.subject,
           class: exam.class,
-          duration: exam.duration,
+          duration: trueDuration,
           description: exam.description,
           instructions: exam.instructions,
           pass_mark: exam.pass_mark,
@@ -182,7 +247,7 @@ export function useExams(
         return
       }
 
-      // 2) Clone child questions from the source exam
+      // 2) Clone child questions
       const { data: sourceQs, error: qFetchErr } = await supabase
         .from('questions')
         .select('*')
@@ -193,12 +258,7 @@ export function useExams(
         console.warn('Could not read source questions:', qFetchErr.message)
       } else if (sourceQs && sourceQs.length > 0) {
         const cloned = sourceQs.map((q: any) => {
-          const {
-            id: _id,
-            created_at: _c,
-            updated_at: _u,
-            ...rest
-          } = q
+          const { id: _id, created_at: _c, updated_at: _u, ...rest } = q
           return {
             ...rest,
             exam_id: newExam.id,
@@ -217,8 +277,7 @@ export function useExams(
           toast.warning('Exam duplicated, but some questions could not be copied')
         }
 
-        // 3) Backfill the new exam's aggregate counts so the list
-        //    and edit page render correctly before any manual save.
+        // 3) Backfill aggregate counts
         const objTotal = cloned
           .filter((q: any) =>
             q.type === 'objective' ||
@@ -273,16 +332,11 @@ export function useExams(
       }
 
       if (!data || data.length === 0) {
-        toast.error(
-          'Submit affected 0 rows — the exam may be locked or missing, or RLS is blocking the update.',
-        )
+        toast.error('Submit affected 0 rows — the exam may be locked or missing.')
         return
       }
 
       toast.success('Exam submitted for approval!')
-
-      // Optimistic local patch so the status badge updates instantly,
-      // then re-fetch to stay consistent with server (term/status filters).
       setExams((prev) =>
         prev.map((e) => (e.id === examId ? { ...e, status: 'pending' } : e))
       )
