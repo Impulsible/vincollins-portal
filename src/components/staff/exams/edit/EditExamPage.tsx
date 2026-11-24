@@ -1,5 +1,4 @@
 // src/components/staff/exams/edit/EditExamPage.tsx
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -124,7 +123,6 @@ const SS_SUBJECTS = [
 ];
 
 /* ─── HELPERS ─── */
-
 function isObjectiveRow(q: any): boolean {
   return (
     q?.type === "objective" ||
@@ -138,7 +136,6 @@ function isTheoryRow(q: any): boolean {
 }
 
 /* ─── PURE COMPONENTS ─── */
-
 function StatTile({
   value,
   label,
@@ -179,6 +176,11 @@ function QuestionCard({
 }: QuestionCardProps) {
   const objQ = type === "objective" ? (question as Question) : null;
   const theoryQ = type === "theory" ? (question as TheoryQuestion) : null;
+
+  const currentPoints =
+    question.points !== undefined && question.points !== null
+      ? question.points
+      : (question as any).marks ?? (type === "theory" ? 10 : 0.5);
 
   const isComplete =
     type === "objective"
@@ -263,27 +265,34 @@ function QuestionCard({
               )}
             </div>
 
-            {/* Mark / Point Input Control */}
+            {/* Marks / Points Input Control */}
             <div className="flex items-center gap-1.5">
               <label className="text-[10px] font-semibold text-slate-500 uppercase">
                 Marks:
               </label>
               {type === "theory" && onPointsChange ? (
-                <input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  max="60"
-                  value={question.points ?? 10}
-                  onChange={(e) => onPointsChange(parseFloat(e.target.value) || 0)}
-                  className="w-14 h-6 text-center text-xs font-bold rounded border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    max="60"
+                    value={currentPoints}
+                    onChange={(e) =>
+                      onPointsChange(parseFloat(e.target.value) || 0)
+                    }
+                    className="w-14 h-6 text-center text-xs font-bold rounded border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                  <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                    mks
+                  </span>
+                </div>
               ) : (
                 <Badge
                   variant="outline"
                   className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 dark:border-slate-700 px-1.5 py-0.5"
                 >
-                  {question.points} pt{question.points !== 1 ? "s" : ""}
+                  {currentPoints} pt{currentPoints !== 1 ? "s" : ""}
                 </Badge>
               )}
             </div>
@@ -404,7 +413,6 @@ function QuestionCard({
 }
 
 /* ─── MAIN COMPONENT ─── */
-
 export function EditExamPage({ examId }: { examId: string }) {
   const router = useRouter();
 
@@ -451,6 +459,7 @@ export function EditExamPage({ examId }: { examId: string }) {
   } | null>(null);
 
   const initialLoadDoneRef = useRef(false);
+  const hasMarksColRef = useRef(true);
 
   const availableSubjects = useMemo(() => {
     if (!examDetails.class) return [];
@@ -469,12 +478,20 @@ export function EditExamPage({ examId }: { examId: string }) {
     return Math.min(questionsToAnswer, theoryCount);
   }, [hasTheory, questionsToAnswer, theoryCount]);
 
-  // Calculate theory total based on the required N questions
+  // Calculate theory total based on candidate answering effectiveN questions (highest N questions if varied)
   const totalTheoryPoints = useMemo(() => {
     if (!hasTheory || theoryCount === 0 || effectiveN === 0) return 0;
-    return theoryQuestions
+    const sorted = [...theoryQuestions].sort(
+      (a, b) =>
+        (Number(b.points ?? (b as any).marks) || 0) -
+        (Number(a.points ?? (a as any).marks) || 0),
+    );
+    return sorted
       .slice(0, effectiveN)
-      .reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+      .reduce(
+        (sum, q) => sum + (Number(q.points ?? (q as any).marks) || 0),
+        0,
+      );
   }, [hasTheory, theoryCount, effectiveN, theoryQuestions]);
 
   const targetTheoryMarks = Math.max(0, EXAM_TOTAL_MARKS - totalObjectivePoints);
@@ -487,37 +504,43 @@ export function EditExamPage({ examId }: { examId: string }) {
   ).length;
 
   const buildQuestionsJSON = useCallback(() => {
-    return questions.map((q, idx) => ({
-      id: q.id,
-      question: q.question_text,
-      question_text: q.question_text,
-      options: q.options || [],
-      correct_answer: q.correct_answer || "",
-      answer: q.correct_answer || "",
-      marks: q.points || defaultMark,
-      points: q.points || defaultMark,
-      type: "objective",
-      image_url: q.image_url || null,
-      image_caption: q.image_caption || null,
-      order: idx + 1,
-    }));
+    return questions.map((q, idx) => {
+      const pts = Number(q.points) || defaultMark;
+      return {
+        id: q.id,
+        question: q.question_text,
+        question_text: q.question_text,
+        options: q.options || [],
+        correct_answer: q.correct_answer || "",
+        answer: q.correct_answer || "",
+        marks: pts,
+        points: pts,
+        type: "objective",
+        image_url: q.image_url || null,
+        image_caption: q.image_caption || null,
+        order: idx + 1,
+      };
+    });
   }, [questions, defaultMark]);
 
   const buildTheoryQuestionsJSON = useCallback(() => {
-    return theoryQuestions.map((q, idx) => ({
-      id: q.id,
-      question: q.question_text,
-      question_text: q.question_text,
-      marks: q.points ?? 10,
-      points: q.points ?? 10,
-      type: "theory",
-      sub_questions: q.sub_questions || [],
-      keywords: q.keywords || [],
-      model_answer: q.model_answer || "",
-      image_url: q.image_url || null,
-      image_caption: q.image_caption || null,
-      order: idx + 1,
-    }));
+    return theoryQuestions.map((q, idx) => {
+      const pts = Number(q.points ?? (q as any).marks) || 10;
+      return {
+        id: q.id,
+        question: q.question_text,
+        question_text: q.question_text,
+        marks: pts,
+        points: pts,
+        type: "theory",
+        sub_questions: q.sub_questions || [],
+        keywords: q.keywords || [],
+        model_answer: q.model_answer || "",
+        image_url: q.image_url || null,
+        image_caption: q.image_caption || null,
+        order: idx + 1,
+      };
+    });
   }, [theoryQuestions]);
 
   const loadQuestions = useCallback(
@@ -535,38 +558,57 @@ export function EditExamPage({ examId }: { examId: string }) {
         if (error) throw error;
 
         const rows = data || [];
+        if (rows.length > 0) {
+          hasMarksColRef.current = "marks" in rows[0];
+        }
 
-        const objQs = rows.filter(isObjectiveRow).map((q) => ({
-          ...q,
-          question_text: q.question_text || "",
-          options: q.options || [],
-          points:
-            typeof q.points === "string"
-              ? parseFloat(q.points)
-              : q.points || defaultMark,
-          type: "objective" as const,
-          question_type: q.question_type || "mcq",
-          image_url: q.image_url || null,
-          image_caption: q.image_caption || null,
-        }));
+        const objQs = rows.filter(isObjectiveRow).map((q) => {
+          const rawPts =
+            q.points !== undefined && q.points !== null
+              ? q.points
+              : q.marks !== undefined && q.marks !== null
+                ? q.marks
+                : defaultMark;
+          const pts =
+            typeof rawPts === "string" ? parseFloat(rawPts) : Number(rawPts) || defaultMark;
+
+          return {
+            ...q,
+            question_text: q.question_text || "",
+            options: q.options || [],
+            points: pts,
+            marks: pts,
+            type: "objective" as const,
+            question_type: q.question_type || "mcq",
+            image_url: q.image_url || null,
+            image_caption: q.image_caption || null,
+          };
+        });
         setQuestions(objQs as Question[]);
 
-        const thQs = rows.filter(isTheoryRow).map((q) => ({
-          ...q,
-          question_text: q.question_text || "",
-          points:
-            typeof q.points === "string"
-              ? parseFloat(q.points)
-              : q.points !== undefined && q.points !== null
-                ? q.points
-                : 10,
-          sub_questions: q.sub_questions || [],
-          keywords: q.keywords || [],
-          type: "theory" as const,
-          question_type: "theory" as const,
-          image_url: q.image_url || null,
-          image_caption: q.image_caption || null,
-        }));
+        const thQs = rows.filter(isTheoryRow).map((q) => {
+          const rawPts =
+            q.points !== undefined && q.points !== null
+              ? q.points
+              : q.marks !== undefined && q.marks !== null
+                ? q.marks
+                : 10;
+          const pts =
+            typeof rawPts === "string" ? parseFloat(rawPts) : Number(rawPts) || 10;
+
+          return {
+            ...q,
+            question_text: q.question_text || "",
+            points: pts,
+            marks: pts,
+            sub_questions: q.sub_questions || [],
+            keywords: q.keywords || [],
+            type: "theory" as const,
+            question_type: "theory" as const,
+            image_url: q.image_url || null,
+            image_caption: q.image_caption || null,
+          };
+        });
         setTheoryQuestions(thQs as TheoryQuestion[]);
 
         if (!silent) toast.success("Questions refreshed");
@@ -652,16 +694,36 @@ export function EditExamPage({ examId }: { examId: string }) {
     const updated = theoryQuestions.map((q) => ({
       ...q,
       points: marksPerQ,
+      marks: marksPerQ,
     }));
     setTheoryQuestions(updated);
 
     try {
-      for (const q of updated) {
-        await supabase
-          .from("questions")
-          .update({ points: marksPerQ, updated_at: new Date().toISOString() })
-          .eq("id", q.id);
-      }
+      await Promise.all(
+        updated.map(async (q) => {
+          const payload: Record<string, any> = {
+            points: marksPerQ,
+            updated_at: new Date().toISOString(),
+          };
+          if (hasMarksColRef.current) payload.marks = marksPerQ;
+
+          const { error } = await supabase
+            .from("questions")
+            .update(payload)
+            .eq("id", q.id);
+
+          if (error && error.message?.includes("marks")) {
+            hasMarksColRef.current = false;
+            await supabase
+              .from("questions")
+              .update({
+                points: marksPerQ,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", q.id);
+          }
+        }),
+      );
       toast.success(
         `Balanced: ${marksPerQ} marks per question (${n} required × ${marksPerQ} = ${requiredTarget} marks)`,
       );
@@ -671,13 +733,39 @@ export function EditExamPage({ examId }: { examId: string }) {
   };
 
   const handleUpdateTheoryMarks = async (id: string, newPoints: number) => {
+    // 1. Immediately update local state for responsive UI
     setTheoryQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, points: newPoints } : q)),
+      prev.map((q) =>
+        q.id === id ? { ...q, points: newPoints, marks: newPoints } : q,
+      ),
     );
-    await supabase
-      .from("questions")
-      .update({ points: newPoints, updated_at: new Date().toISOString() })
-      .eq("id", id);
+
+    // 2. Persist to database questions table safely
+    try {
+      const payload: Record<string, any> = {
+        points: newPoints,
+        updated_at: new Date().toISOString(),
+      };
+      if (hasMarksColRef.current) payload.marks = newPoints;
+
+      const { error } = await supabase
+        .from("questions")
+        .update(payload)
+        .eq("id", id);
+
+      if (error && error.message?.includes("marks")) {
+        hasMarksColRef.current = false;
+        await supabase
+          .from("questions")
+          .update({
+            points: newPoints,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+      }
+    } catch (e) {
+      console.error("Inline mark update failed:", e);
+    }
   };
 
   const updateExamTotals = useCallback(async () => {
@@ -725,8 +813,9 @@ export function EditExamPage({ examId }: { examId: string }) {
 
   useEffect(() => {
     if (!loading && initialLoadDoneRef.current) updateExamTotals();
-  }, [totalQuestions, totalExamPoints, updateExamTotals, loading]);
+  }, [totalQuestions, totalExamPoints, questionsToAnswer, updateExamTotals, loading]);
 
+  // Master Save Button: Persists Exam record + All question points across the database
   const handleSaveExam = async () => {
     if (!examDetails.title.trim()) {
       toast.error("Please enter an exam title");
@@ -755,6 +844,53 @@ export function EditExamPage({ examId }: { examId: string }) {
       const questionsJSON = buildQuestionsJSON();
       const theoryQuestionsJSON = buildTheoryQuestionsJSON();
 
+      // 1. Sync every theory and objective question to the `questions` table
+      await Promise.all([
+        ...theoryQuestions.map(async (tq) => {
+          const pts = Number(tq.points ?? (tq as any).marks) || 10;
+          const payload: Record<string, any> = {
+            points: pts,
+            updated_at: new Date().toISOString(),
+          };
+          if (hasMarksColRef.current) payload.marks = pts;
+
+          const { error } = await supabase
+            .from("questions")
+            .update(payload)
+            .eq("id", tq.id);
+
+          if (error && error.message?.includes("marks")) {
+            hasMarksColRef.current = false;
+            await supabase
+              .from("questions")
+              .update({ points: pts, updated_at: new Date().toISOString() })
+              .eq("id", tq.id);
+          }
+        }),
+        ...questions.map(async (oq) => {
+          const pts = Number(oq.points) || defaultMark;
+          const payload: Record<string, any> = {
+            points: pts,
+            updated_at: new Date().toISOString(),
+          };
+          if (hasMarksColRef.current) payload.marks = pts;
+
+          const { error } = await supabase
+            .from("questions")
+            .update(payload)
+            .eq("id", oq.id);
+
+          if (error && error.message?.includes("marks")) {
+            hasMarksColRef.current = false;
+            await supabase
+              .from("questions")
+              .update({ points: pts, updated_at: new Date().toISOString() })
+              .eq("id", oq.id);
+          }
+        }),
+      ]);
+
+      // 2. Save complete exam configuration to `exams` table
       const payload = {
         title: examDetails.title.trim(),
         subject: examDetails.subject,
@@ -768,7 +904,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         shuffle_questions: examDetails.shuffle_questions,
         shuffle_options: examDetails.shuffle_options,
         has_theory: hasTheory,
-        questions_to_answer: questionsToAnswer,
+        questions_to_answer: effectiveN > 0 ? effectiveN : questionsToAnswer,
         term: examDetails.term,
         session_year: examDetails.session_year,
         target_audience: examDetails.target_audience,
@@ -795,8 +931,10 @@ export function EditExamPage({ examId }: { examId: string }) {
         .from("exams")
         .update(payload)
         .eq("id", examId);
+
       if (error) throw error;
-      toast.success("Exam updated successfully");
+
+      toast.success("Exam and question marks saved successfully across system");
       router.push("/staff/exams");
     } catch (e: any) {
       toast.error(e.message || "Failed to update exam");
@@ -812,31 +950,35 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const opts = (data.options || []).filter((o) => o.trim());
     const isDraft = data.is_draft ?? true;
+    const pts = data.points || defaultMark;
+
+    const payload: Record<string, any> = {
+      exam_id: examId,
+      question_text: data.question_text.trim(),
+      question_type: "mcq",
+      type: "objective",
+      options: opts.length ? opts : ["", "", "", ""],
+      correct_answer: data.correct_answer?.trim() || "",
+      points: pts,
+      order_number: questions.length + 1,
+      is_draft: isDraft,
+      sub_questions: [],
+      keywords: [],
+      model_answer: "",
+      image_url: data.image_url || null,
+      image_caption: data.image_caption || null,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (hasMarksColRef.current) payload.marks = pts;
+
     const { error } = await supabase
       .from("questions")
-      .insert([
-        {
-          exam_id: examId,
-          question_text: data.question_text.trim(),
-          question_type: "mcq",
-          type: "objective",
-          options: opts.length ? opts : ["", "", "", ""],
-          correct_answer: data.correct_answer?.trim() || "",
-          points: data.points || defaultMark,
-          order_number: questions.length + 1,
-          is_draft: isDraft,
-          sub_questions: [],
-          keywords: [],
-          model_answer: "",
-          image_url: data.image_url || null,
-          image_caption: data.image_caption || null,
-          deleted_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
+      .insert([payload])
       .select()
       .single();
+
     if (error) {
       toast.error(`Failed to add question: ${error.message}`);
       return;
@@ -854,22 +996,28 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const opts = (data.options || []).filter((o) => o.trim());
     const isDraft = data.is_draft ?? false;
+    const pts = data.points || defaultMark;
+
+    const payload: Record<string, any> = {
+      question_text: data.question_text.trim(),
+      options: opts.length ? opts : ["", "", "", ""],
+      correct_answer: data.correct_answer?.trim() || "",
+      points: pts,
+      is_draft: isDraft,
+      question_type: "mcq",
+      type: "objective",
+      image_url: data.image_url !== undefined ? data.image_url : null,
+      image_caption:
+        data.image_caption !== undefined ? data.image_caption : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (hasMarksColRef.current) payload.marks = pts;
+
     const { error } = await supabase
       .from("questions")
-      .update({
-        question_text: data.question_text.trim(),
-        options: opts.length ? opts : ["", "", "", ""],
-        correct_answer: data.correct_answer?.trim() || "",
-        points: data.points || defaultMark,
-        is_draft: isDraft,
-        question_type: "mcq",
-        type: "objective",
-        image_url: data.image_url !== undefined ? data.image_url : null,
-        image_caption:
-          data.image_caption !== undefined ? data.image_caption : null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq("id", id);
+
     if (error) {
       toast.error(`Failed to update: ${error.message}`);
       return;
@@ -906,36 +1054,38 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const isDraft = data.is_draft ?? true;
     const defaultPoints =
-      data.points ||
+      data.points ??
       (effectiveN > 0
         ? Math.round((targetTheoryMarks / effectiveN) * 10) / 10
         : 10);
 
+    const payload: Record<string, any> = {
+      exam_id: examId,
+      question_text: data.question_text.trim(),
+      question_type: "theory",
+      type: "theory",
+      points: defaultPoints,
+      order_number: theoryQuestions.length + 1,
+      sub_questions: data.sub_questions || [],
+      keywords: data.keywords || [],
+      model_answer: data.model_answer || "",
+      is_draft: isDraft,
+      options: [],
+      correct_answer: "",
+      image_url: data.image_url || null,
+      image_caption: data.image_caption || null,
+      deleted_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (hasMarksColRef.current) payload.marks = defaultPoints;
+
     const { error } = await supabase
       .from("questions")
-      .insert([
-        {
-          exam_id: examId,
-          question_text: data.question_text.trim(),
-          question_type: "theory",
-          type: "theory",
-          points: defaultPoints,
-          order_number: theoryQuestions.length + 1,
-          sub_questions: data.sub_questions || [],
-          keywords: data.keywords || [],
-          model_answer: data.model_answer || "",
-          is_draft: isDraft,
-          options: [],
-          correct_answer: "",
-          image_url: data.image_url || null,
-          image_caption: data.image_caption || null,
-          deleted_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
+      .insert([payload])
       .select()
       .single();
+
     if (error) {
       toast.error(`Failed to add theory question: ${error.message}`);
       return;
@@ -957,23 +1107,29 @@ export function EditExamPage({ examId }: { examId: string }) {
       return;
     }
     const isDraft = data.is_draft ?? false;
+    const pts = data.points ?? (data as any).marks ?? 10;
+
+    const payload: Record<string, any> = {
+      question_text: data.question_text.trim(),
+      points: pts,
+      sub_questions: data.sub_questions || [],
+      keywords: data.keywords || [],
+      model_answer: data.model_answer || "",
+      is_draft: isDraft,
+      question_type: "theory",
+      type: "theory",
+      image_url: data.image_url !== undefined ? data.image_url : null,
+      image_caption:
+        data.image_caption !== undefined ? data.image_caption : null,
+      updated_at: new Date().toISOString(),
+    };
+    if (hasMarksColRef.current) payload.marks = pts;
+
     const { error } = await supabase
       .from("questions")
-      .update({
-        question_text: data.question_text.trim(),
-        points: data.points ?? 10,
-        sub_questions: data.sub_questions || [],
-        keywords: data.keywords || [],
-        model_answer: data.model_answer || "",
-        is_draft: isDraft,
-        question_type: "theory",
-        type: "theory",
-        image_url: data.image_url !== undefined ? data.image_url : null,
-        image_caption:
-          data.image_caption !== undefined ? data.image_caption : null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq("id", id);
+
     if (error) {
       toast.error(`Failed to update: ${error.message}`);
       return;
@@ -987,7 +1143,6 @@ export function EditExamPage({ examId }: { examId: string }) {
   };
 
   /* ─── RENDERERS ─── */
-
   if (loading) {
     return (
       <div className="p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 max-w-[1600px] mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
@@ -1060,7 +1215,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                   onClick={() => {
                     setDefaultMark(mark);
                     setQuestions((prev) =>
-                      prev.map((q) => ({ ...q, points: mark })),
+                      prev.map((q) => ({ ...q, points: mark, marks: mark })),
                     );
                     toast.info(`Default objective mark set to ${mark}`);
                   }}
@@ -1091,7 +1246,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                     Theory Rule:
                   </span>
                   <p className="text-[10px] text-purple-600 dark:text-purple-400">
-                    Candidates answer {effectiveN} of {theoryCount} Qs
+                    Candidates answer {effectiveN} of {theoryCount} Qs ({totalTheoryPoints} marks)
                   </p>
                 </div>
               </div>
