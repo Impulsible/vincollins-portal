@@ -24,7 +24,8 @@ import {
   FileText,
   LayoutList,
   Target,
-  Brain,
+  Users,
+  Sparkles,
   ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -165,6 +166,7 @@ interface QuestionCardProps {
   type: "objective" | "theory";
   onEdit: () => void;
   onDelete: () => void;
+  onPointsChange?: (points: number) => void;
 }
 
 function QuestionCard({
@@ -173,6 +175,7 @@ function QuestionCard({
   type,
   onEdit,
   onDelete,
+  onPointsChange,
 }: QuestionCardProps) {
   const objQ = type === "objective" ? (question as Question) : null;
   const theoryQ = type === "theory" ? (question as TheoryQuestion) : null;
@@ -223,49 +226,69 @@ function QuestionCard({
           {index}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-2">
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5",
-                type === "objective"
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
-              )}
-            >
-              {type === "objective" ? (
-                <BookOpen className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              ) : (
-                <FlaskConical className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              )}
-              {type === "objective" ? "Obj" : "Theory"}
-            </Badge>
-            <Badge
-              className={cn(
-                "text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5",
-                statusConfig.badge,
-              )}
-            >
-              <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              {statusConfig.label}
-            </Badge>
-            <Badge
-              variant="outline"
-              className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 dark:border-slate-700 px-1.5 py-0.5"
-            >
-              {question.points} pt{question.points !== 1 ? "s" : ""}
-            </Badge>
-            {question.image_url && (
+          <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
               <Badge
                 variant="outline"
-                className="text-[10px] sm:text-xs font-medium text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 gap-1"
+                className={cn(
+                  "text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5",
+                  type === "objective"
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+                )}
               >
-                <ImageIcon className="h-2.5 w-2.5" /> Diagram
+                {type === "objective" ? (
+                  <BookOpen className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                ) : (
+                  <FlaskConical className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                )}
+                {type === "objective" ? "Obj" : "Theory"}
               </Badge>
-            )}
+              <Badge
+                className={cn(
+                  "text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5",
+                  statusConfig.badge,
+                )}
+              >
+                <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                {statusConfig.label}
+              </Badge>
+              {question.image_url && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] sm:text-xs font-medium text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 gap-1"
+                >
+                  <ImageIcon className="h-2.5 w-2.5" /> Diagram
+                </Badge>
+              )}
+            </div>
+
+            {/* Mark / Point Input Control */}
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase">
+                Marks:
+              </label>
+              {type === "theory" && onPointsChange ? (
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  max="60"
+                  value={question.points ?? 10}
+                  onChange={(e) => onPointsChange(parseFloat(e.target.value) || 0)}
+                  className="w-14 h-6 text-center text-xs font-bold rounded border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 dark:border-slate-700 px-1.5 py-0.5"
+                >
+                  {question.points} pt{question.points !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </div>
           </div>
 
-          {/* Render question text and attached diagram with Markdown & Table formatting support */}
           <QuestionContent
             text={question.question_text}
             imageUrl={question.image_url ?? undefined}
@@ -335,7 +358,7 @@ function QuestionCard({
               </div>
             )}
 
-          {/* Mobile action buttons - always visible */}
+          {/* Mobile action buttons */}
           <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 sm:hidden">
             <Button
               variant="ghost"
@@ -356,7 +379,7 @@ function QuestionCard({
           </div>
         </div>
 
-        {/* Desktop action buttons - hover reveal */}
+        {/* Desktop action buttons */}
         <div className="flex-shrink-0 hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
@@ -395,12 +418,12 @@ export function EditExamPage({ examId }: { examId: string }) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
+  const [questionsToAnswer, setQuestionsToAnswer] = useState<number>(4);
 
   const [passageText, setPassageText] = useState("");
   const [hasPassage, setHasPassage] = useState(false);
 
   const [defaultMark, setDefaultMark] = useState(0.5);
-  const [theoryTotalMarks, setTheoryTotalMarks] = useState(40);
 
   const [examDetails, setExamDetails] = useState<ExamDetailsForm>({
     title: "",
@@ -438,7 +461,23 @@ export function EditExamPage({ examId }: { examId: string }) {
   const theoryCount = theoryQuestions.length;
   const totalQuestions = objectiveCount + theoryCount;
   const totalObjectivePoints = objectiveCount * defaultMark;
-  const totalTheoryPoints = theoryTotalMarks;
+
+  // Answer N of M Theory Rules
+  const effectiveN = useMemo(() => {
+    if (!hasTheory || theoryCount === 0) return 0;
+    if (!questionsToAnswer || questionsToAnswer <= 0) return theoryCount;
+    return Math.min(questionsToAnswer, theoryCount);
+  }, [hasTheory, questionsToAnswer, theoryCount]);
+
+  // Calculate theory total based on the required N questions
+  const totalTheoryPoints = useMemo(() => {
+    if (!hasTheory || theoryCount === 0 || effectiveN === 0) return 0;
+    return theoryQuestions
+      .slice(0, effectiveN)
+      .reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+  }, [hasTheory, theoryCount, effectiveN, theoryQuestions]);
+
+  const targetTheoryMarks = Math.max(0, EXAM_TOTAL_MARKS - totalObjectivePoints);
   const totalExamPoints = totalObjectivePoints + totalTheoryPoints;
   const passMarkPercentage =
     totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0;
@@ -465,13 +504,12 @@ export function EditExamPage({ examId }: { examId: string }) {
   }, [questions, defaultMark]);
 
   const buildTheoryQuestionsJSON = useCallback(() => {
-    const marksPerTheory = theoryCount > 0 ? theoryTotalMarks / theoryCount : 0;
     return theoryQuestions.map((q, idx) => ({
       id: q.id,
       question: q.question_text,
       question_text: q.question_text,
-      marks: q.points || marksPerTheory,
-      points: q.points || marksPerTheory,
+      marks: q.points ?? 10,
+      points: q.points ?? 10,
       type: "theory",
       sub_questions: q.sub_questions || [],
       keywords: q.keywords || [],
@@ -480,7 +518,7 @@ export function EditExamPage({ examId }: { examId: string }) {
       image_caption: q.image_caption || null,
       order: idx + 1,
     }));
-  }, [theoryQuestions, theoryTotalMarks, theoryCount]);
+  }, [theoryQuestions]);
 
   const loadQuestions = useCallback(
     async (silent = false) => {
@@ -519,8 +557,9 @@ export function EditExamPage({ examId }: { examId: string }) {
           points:
             typeof q.points === "string"
               ? parseFloat(q.points)
-              : q.points ||
-                (theoryCount > 0 ? theoryTotalMarks / theoryCount : 5),
+              : q.points !== undefined && q.points !== null
+                ? q.points
+                : 10,
           sub_questions: q.sub_questions || [],
           keywords: q.keywords || [],
           type: "theory" as const,
@@ -537,7 +576,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         setRefreshing(false);
       }
     },
-    [examId, defaultMark, theoryTotalMarks, theoryCount],
+    [examId, defaultMark],
   );
 
   const loadExamData = useCallback(async () => {
@@ -569,7 +608,7 @@ export function EditExamPage({ examId }: { examId: string }) {
       setExam(merged as Exam);
       setHasTheory(examData.has_theory || false);
       setDefaultMark(examData.default_mark || 0.5);
-      setTheoryTotalMarks(examData.theory_total_marks || 40);
+      setQuestionsToAnswer(examData.questions_to_answer || 4);
 
       setExamDetails({
         title: examData.title || "",
@@ -600,6 +639,47 @@ export function EditExamPage({ examId }: { examId: string }) {
     if (examId) loadExamData();
   }, [examId, loadExamData]);
 
+  // Handle Clean Auto-Balance without decimals
+  const handleAutoBalance = async () => {
+    if (theoryCount === 0) {
+      toast.error("Please add theory questions first");
+      return;
+    }
+    const n = effectiveN > 0 ? effectiveN : theoryCount;
+    const requiredTarget = Math.max(0, EXAM_TOTAL_MARKS - totalObjectivePoints);
+    const marksPerQ = Math.round((requiredTarget / n) * 10) / 10;
+
+    const updated = theoryQuestions.map((q) => ({
+      ...q,
+      points: marksPerQ,
+    }));
+    setTheoryQuestions(updated);
+
+    try {
+      for (const q of updated) {
+        await supabase
+          .from("questions")
+          .update({ points: marksPerQ, updated_at: new Date().toISOString() })
+          .eq("id", q.id);
+      }
+      toast.success(
+        `Balanced: ${marksPerQ} marks per question (${n} required × ${marksPerQ} = ${requiredTarget} marks)`,
+      );
+    } catch {
+      toast.error("Failed to update question marks in database");
+    }
+  };
+
+  const handleUpdateTheoryMarks = async (id: string, newPoints: number) => {
+    setTheoryQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, points: newPoints } : q)),
+    );
+    await supabase
+      .from("questions")
+      .update({ points: newPoints, updated_at: new Date().toISOString() })
+      .eq("id", id);
+  };
+
   const updateExamTotals = useCallback(async () => {
     if (!examId || loading || !initialLoadDoneRef.current) return;
     if (totalQuestions === 0 && (exam?.total_questions ?? 0) > 0) return;
@@ -617,6 +697,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         theory_max: totalTheoryPoints,
         theory_total_marks: totalTheoryPoints,
         objective_total_marks: totalObjectivePoints,
+        questions_to_answer: questionsToAnswer,
         exam_total_marks: EXAM_TOTAL_MARKS,
         ca1_max: 10,
         ca2_max: 10,
@@ -634,6 +715,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     totalExamPoints,
     totalObjectivePoints,
     totalTheoryPoints,
+    questionsToAnswer,
     defaultMark,
     loading,
     buildQuestionsJSON,
@@ -686,6 +768,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         shuffle_questions: examDetails.shuffle_questions,
         shuffle_options: examDetails.shuffle_options,
         has_theory: hasTheory,
+        questions_to_answer: questionsToAnswer,
         term: examDetails.term,
         session_year: examDetails.session_year,
         target_audience: examDetails.target_audience,
@@ -822,8 +905,12 @@ export function EditExamPage({ examId }: { examId: string }) {
       return;
     }
     const isDraft = data.is_draft ?? true;
-    const marksPerTheory =
-      theoryCount > 0 ? theoryTotalMarks / theoryCount : data.points || 5;
+    const defaultPoints =
+      data.points ||
+      (effectiveN > 0
+        ? Math.round((targetTheoryMarks / effectiveN) * 10) / 10
+        : 10);
+
     const { error } = await supabase
       .from("questions")
       .insert([
@@ -832,7 +919,7 @@ export function EditExamPage({ examId }: { examId: string }) {
           question_text: data.question_text.trim(),
           question_type: "theory",
           type: "theory",
-          points: data.points || marksPerTheory,
+          points: defaultPoints,
           order_number: theoryQuestions.length + 1,
           sub_questions: data.sub_questions || [],
           keywords: data.keywords || [],
@@ -870,13 +957,11 @@ export function EditExamPage({ examId }: { examId: string }) {
       return;
     }
     const isDraft = data.is_draft ?? false;
-    const marksPerTheory =
-      theoryCount > 0 ? theoryTotalMarks / theoryCount : data.points || 5;
     const { error } = await supabase
       .from("questions")
       .update({
         question_text: data.question_text.trim(),
-        points: data.points || marksPerTheory,
+        points: data.points ?? 10,
         sub_questions: data.sub_questions || [],
         keywords: data.keywords || [],
         model_answer: data.model_answer || "",
@@ -959,13 +1044,13 @@ export function EditExamPage({ examId }: { examId: string }) {
         />
 
         {/* Controls Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-          {/* Mark Selector */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+          {/* Objective Mark Selector */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
             <div className="flex items-center gap-2 min-w-0">
               <Target className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
-                Mark/Q:
+                Mark/Obj Q:
               </span>
             </div>
             <div className="flex gap-1">
@@ -977,7 +1062,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                     setQuestions((prev) =>
                       prev.map((q) => ({ ...q, points: mark })),
                     );
-                    toast.info(`Default mark set to ${mark}`);
+                    toast.info(`Default objective mark set to ${mark}`);
                   }}
                   className={cn(
                     "px-3 py-1 rounded-md text-xs font-semibold transition-all min-w-[40px]",
@@ -992,46 +1077,76 @@ export function EditExamPage({ examId }: { examId: string }) {
             </div>
             <span className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 w-full sm:w-auto sm:ml-auto">
               {objectiveCount} × {defaultMark} ={" "}
-              <strong>{totalObjectivePoints}</strong>
+              <strong>{totalObjectivePoints} marks</strong>
             </span>
           </div>
 
-          {/* Theory Total Input */}
+          {/* Theory N of M & Auto-Balance Controls */}
           {hasTheory && (
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2.5 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800/50">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800/50">
               <div className="flex items-center gap-2 min-w-0">
-                <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                <span className="text-xs font-medium text-purple-700 dark:text-purple-300 whitespace-nowrap">
-                  Theory:
-                </span>
+                <Users className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <div>
+                  <span className="text-xs font-semibold text-purple-900 dark:text-purple-200">
+                    Theory Rule:
+                  </span>
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400">
+                    Candidates answer {effectiveN} of {theoryCount} Qs
+                  </p>
+                </div>
               </div>
-              <Input
-                type="number"
-                min="0"
-                max={EXAM_TOTAL_MARKS - totalObjectivePoints}
-                value={theoryTotalMarks}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0;
-                  setTheoryTotalMarks(
-                    Math.min(val, EXAM_TOTAL_MARKS - totalObjectivePoints),
-                  );
-                }}
-                className="w-16 h-8 text-center text-sm font-bold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-              />
-              <span className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400">
-                / {EXAM_TOTAL_MARKS - totalObjectivePoints}
-              </span>
-              <span className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 w-full sm:w-auto sm:ml-auto">
-                {theoryCount} ×{" "}
-                {theoryCount > 0
-                  ? (theoryTotalMarks / theoryCount).toFixed(2)
-                  : 0}
-              </span>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-2 py-1">
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Answer
+                  </span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={theoryCount || 1}
+                    value={questionsToAnswer}
+                    onChange={(e) =>
+                      setQuestionsToAnswer(
+                        Math.max(1, parseInt(e.target.value) || 1),
+                      )
+                    }
+                    className="w-12 h-6 text-center text-xs font-bold border-0 bg-transparent p-0 focus-visible:ring-0 text-purple-700 dark:text-purple-300"
+                  />
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    of {theoryCount}
+                  </span>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleAutoBalance}
+                  className="h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white gap-1 px-2.5 shadow-sm"
+                >
+                  <Sparkles className="h-3 w-3" /> Auto-Balance
+                </Button>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Points Summary */}
+        {/* Validation / Over-Limit Alert Banner */}
+        {!isBalanced && (
+          <Alert
+            variant="destructive"
+            className="rounded-xl border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200 py-2.5"
+          >
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-xs font-medium">
+              Total is {totalExamPoints} marks —{" "}
+              {totalExamPoints > EXAM_TOTAL_MARKS
+                ? `exceeds ${EXAM_TOTAL_MARKS} by ${totalExamPoints - EXAM_TOTAL_MARKS}. Reduce objective points or theory question marks to balance.`
+                : `short of ${EXAM_TOTAL_MARKS} by ${EXAM_TOTAL_MARKS - totalExamPoints}. Adjust marks to reach exactly ${EXAM_TOTAL_MARKS}.`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Points Summary Card */}
         <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
           <CardContent className="p-3 sm:p-4">
@@ -1041,7 +1156,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                   <Calculator className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h3 className="font-semibold text-xs sm:text-sm text-slate-700 dark:text-slate-200 truncate">
-                  Points Summary
+                  Points Allocation Summary
                 </h3>
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -1054,8 +1169,8 @@ export function EditExamPage({ examId }: { examId: string }) {
                   )}
                 >
                   {isBalanced
-                    ? `✅ ${EXAM_TOTAL_MARKS}`
-                    : `⚠️ ${totalExamPoints}`}
+                    ? `Current: ${EXAM_TOTAL_MARKS} / ${EXAM_TOTAL_MARKS}`
+                    : `Current: ${totalExamPoints} / ${EXAM_TOTAL_MARKS}`}
                 </Badge>
                 <Button
                   variant="ghost"
@@ -1077,17 +1192,17 @@ export function EditExamPage({ examId }: { examId: string }) {
                 accent="bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
               />
               <StatTile
-                value={totalObjectivePoints}
+                value={`${totalObjectivePoints} mks`}
                 label="Obj. Points"
                 accent="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300"
               />
               <StatTile
-                value={theoryCount}
-                label="Theory Qs"
+                value={hasTheory ? `${effectiveN} of ${theoryCount}` : "0"}
+                label="Theory Choice"
                 accent="bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300"
               />
               <StatTile
-                value={totalTheoryPoints}
+                value={`${totalTheoryPoints} mks`}
                 label="Theory Points"
                 accent="bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300"
               />
@@ -1096,7 +1211,7 @@ export function EditExamPage({ examId }: { examId: string }) {
               <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
                 <div>
                   <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
-                    Default Mark
+                    Default Obj Mark
                   </p>
                   <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">
                     {defaultMark}
@@ -1104,7 +1219,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                 </div>
                 <div>
                   <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
-                    Obj / Theory
+                    Obj / Theory Balance
                   </p>
                   <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">
                     {totalObjectivePoints} / {totalTheoryPoints}
@@ -1113,7 +1228,7 @@ export function EditExamPage({ examId }: { examId: string }) {
               </div>
               <div className="text-left sm:text-right space-y-0.5">
                 <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
-                  Pass Mark
+                  Pass Mark Target
                 </p>
                 <p className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-200">
                   {examDetails.pass_mark}
@@ -1342,7 +1457,8 @@ export function EditExamPage({ examId }: { examId: string }) {
                           <div className="flex items-center gap-2 py-1">
                             <FlaskConical className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
                             <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                              Theory ({theoryCount})
+                              Theory ({theoryCount}) — Candidates answer{" "}
+                              {effectiveN}
                             </span>
                             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                           </div>
@@ -1352,6 +1468,9 @@ export function EditExamPage({ examId }: { examId: string }) {
                               index={questions.length + idx + 1}
                               question={q}
                               type="theory"
+                              onPointsChange={(pts) =>
+                                handleUpdateTheoryMarks(q.id, pts)
+                              }
                               onEdit={() => {
                                 setEditingTheoryQuestion(q);
                                 setShowTheoryDialog(true);
@@ -1395,7 +1514,7 @@ export function EditExamPage({ examId }: { examId: string }) {
               hasTheory={hasTheory}
               passageText={hasPassage ? passageText : undefined}
               defaultMark={defaultMark}
-              theoryTotalMarks={theoryTotalMarks}
+              theoryTotalMarks={totalTheoryPoints}
             />
           </TabsContent>
         </Tabs>
