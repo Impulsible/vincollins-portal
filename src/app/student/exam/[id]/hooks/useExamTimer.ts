@@ -52,7 +52,7 @@ export function useExamTimer({
       const elapsed = Math.floor((Date.now() - startTime) / 1000)
       return Math.max(0, totalSeconds - elapsed)
     }
-    return 0
+    return totalSeconds
   })
   const [isTimeUp, setIsTimeUp] = useState(false)
 
@@ -68,7 +68,6 @@ export function useExamTimer({
   )
   const extensionSecondsRef = useRef(0)
   const durationSecondsRef = useRef(totalSeconds)
-  const prevDurationRef = useRef(totalSeconds)
 
   const hasAutoSubmittedRef = useRef(false)
   const warningTriggeredRef = useRef(false)
@@ -78,20 +77,23 @@ export function useExamTimer({
   useEffect(() => { onTimeWarningRef.current = onTimeWarning }, [onTimeWarning])
   useEffect(() => { onTimeSyncRef.current = onTimeSync }, [onTimeSync])
 
-  // ✅ Live-extension: react to `durationMinutes` prop changes
+  // ✅ Fixed duration prop updates without double-counting extra 60 mins
   useEffect(() => {
     const next = Math.max(0, Math.floor(durationMinutes * 60))
-    const prev = prevDurationRef.current
-    if (next > prev) {
-      // Treat as an extension
-      extensionSecondsRef.current += next - prev
-      // If we had already auto-submitted / stopped, revive the timer
-      if (hasAutoSubmittedRef.current) hasAutoSubmittedRef.current = false
-      if (stoppedRef.current) stoppedRef.current = false
-      warningTriggeredRef.current = false
-    }
-    prevDurationRef.current = next
     durationSecondsRef.current = next
+
+    if (startTimeRef.current != null) {
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
+      const total = next + extensionSecondsRef.current
+      const remaining = Math.max(0, total - elapsed)
+      setTimeLeft(remaining)
+
+      if (remaining > 0 && hasAutoSubmittedRef.current) {
+        hasAutoSubmittedRef.current = false
+        setIsTimeUp(false)
+        if (stoppedRef.current) stoppedRef.current = false
+      }
+    }
   }, [durationMinutes])
 
   const calculateTimeLeft = useCallback(() => {
@@ -133,7 +135,6 @@ export function useExamTimer({
   useEffect(() => {
     if (!examStarted || examEndedRef.current) { stopTimer(); return }
 
-    // Wait for a real startTime
     if (startTime == null || !Number.isFinite(startTime)) {
       return
     }
@@ -164,7 +165,6 @@ export function useExamTimer({
     stoppedRef.current = false
 
     timerRef.current = setInterval(() => {
-      // If extension un-stopped us, resume; otherwise kill
       if (examEndedRef.current || stoppedRef.current) {
         if (stoppedRef.current && !examEndedRef.current) {
           stoppedRef.current = false
@@ -178,7 +178,6 @@ export function useExamTimer({
       setTimeLeft(remaining)
       onTimeSyncRef.current?.(remaining)
 
-      // ✅ Revived after extension
       if (remaining > 0 && hasAutoSubmittedRef.current && !examEndedRef.current) {
         hasAutoSubmittedRef.current = false
         setIsTimeUp(false)
@@ -200,7 +199,6 @@ export function useExamTimer({
       if (remaining <= 0 && !hasAutoSubmittedRef.current && !examEndedRef.current) {
         hasAutoSubmittedRef.current = true
         setIsTimeUp(true)
-        // ✅ Do NOT kill the interval — allow an extension to revive us
         if (autoSubmit) {
           toast.error("⏰ Time's up! Auto-submitting your exam...")
           setTimeout(() => onTimeUpRef.current(), 1200)
@@ -267,7 +265,6 @@ export function useExamTimer({
     (newDurationMinutes?: number, newStartTime?: number) => {
       if (newDurationMinutes != null && Number.isFinite(newDurationMinutes)) {
         durationSecondsRef.current = Math.max(0, Math.floor(newDurationMinutes * 60))
-        prevDurationRef.current = durationSecondsRef.current
       }
       extensionSecondsRef.current = 0
       startTimeRef.current =

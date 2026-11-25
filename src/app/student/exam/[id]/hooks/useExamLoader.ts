@@ -9,7 +9,6 @@ import { calculateScore } from "../utils/scoring";
 import {
   isSubjectExcludedFromShuffle,
   hasRelativeOptions,
-  resolveExamDuration,
 } from "../constants";
 import {
   requireSession,
@@ -60,86 +59,195 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Safely extracts options from Arrays, JSON strings, Objects, or separate columns
+ * Robustly resolves the exam duration in minutes directly from whatever 
+ * the teacher set (90, 120, 45, etc.), overcoming database default mismatches.
  */
-function extractOptions(q: any): string[] {
-  if (!q) return [];
-  let raw = q.options ?? q.choices;
+export function getTeacherExamDuration(exam: any): number {
+  if (!exam) return 60;
 
-  // 1. JSON String parsing
+  const colA = Number(exam.duration);
+  const colB = Number(exam.duration_minutes);
+
+  const candidates = [colA, colB].filter((n) => Number.isFinite(n) && n > 0);
+
+  if (candidates.length > 0) {
+    // If one column is the 60 min default and the other is what the teacher set (e.g. 90 or 120)
+    if (candidates.length > 1 && candidates.includes(60)) {
+      const teacherCustomTime = candidates.find((c) => c !== 60);
+      if (teacherCustomTime) {
+        return teacherCustomTime <= 4 ? Math.round(teacherCustomTime * 60) : Math.round(teacherCustomTime);
+      }
+    }
+
+    const primary = candidates[0];
+    if (primary > 0 && primary <= 4) {
+      return Math.round(primary * 60); // E.g., 2 (hours) -> 120 minutes
+    }
+    return Math.round(primary);
+  }
+
+  // Fallback check for string descriptions like "90 mins" or "2 hours"
+  const raw =
+    exam.time_limit_minutes ??
+    exam.time_limit ??
+    exam.duration_mins ??
+    exam.total_time;
+
   if (typeof raw === "string") {
-    try {
-      raw = JSON.parse(raw);
-    } catch {
-      raw = raw.split(/\n|,/).map((s: string) => s.trim()).filter(Boolean);
+    const cleaned = raw.trim().toLowerCase();
+    if (cleaned.includes("hr") || cleaned.includes("hour")) {
+      const match = cleaned.match(/([\d.]+)/);
+      if (match) {
+        const hrs = parseFloat(match[1]);
+        if (Number.isFinite(hrs) && hrs > 0) return Math.round(hrs * 60);
+      }
+    }
+
+    const num = parseFloat(cleaned);
+    if (Number.isFinite(num) && num > 0) {
+      if (num <= 4 && !cleaned.includes("min")) return Math.round(num * 60);
+      return Math.round(num);
     }
   }
 
-  // 2. Standard Array
-  if (Array.isArray(raw)) {
-    return raw
+  return 60;
+}
+
+/**
+ * Safely extracts options from Arrays, JSON strings, Objects, 
+ * or separate columns (option_a, option_b, etc.).
+ * Ensures JSS2 and column-based objective questions are never missed.
+ */
+function extractOptions(q: any): string[] {
+  if (!q) return [];
+  let candidates: string[] = [];
+
+  // 1. Try options / choices field
+  let raw = q.options ?? q.choices ?? q.answers;
+
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      if (raw.includes("\n") || raw.includes(",")) {
+        raw = raw.split(/\n|,/).map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+  }
+
+  // Handle parsed array
+  if (Array.isArray(raw) && raw.length > 0) {
+    candidates = raw
       .map((opt) => {
-        if (typeof opt === "string") return opt;
-        if (typeof opt === "number") return String(opt);
+        if (typeof opt === "string") return opt.trim();
+        if (typeof opt === "number") return String(opt).trim();
         if (typeof opt === "object" && opt !== null) {
-          return (
+          return String(
+            opt.text ||
+            opt.option ||
+            opt.value ||
+            opt.label ||
+            opt.content ||
+            opt.option_text ||
+            opt.choice ||
+            ""
+          ).trim();
+        }
+        return String(opt ?? "").trim();
+      })
+      .filter(Boolean);
+  } else if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+    // Handle dictionary objects { A: "...", B: "..." }
+    candidates = Object.values(raw)
+      .map((opt) => {
+        if (typeof opt === "string") return opt.trim();
+        if (typeof opt === "object" && opt !== null) {
+          return String(
             (opt as any).text ||
             (opt as any).option ||
             (opt as any).value ||
             (opt as any).label ||
             ""
-          );
+          ).trim();
         }
-        return String(opt ?? "");
+        return String(opt ?? "").trim();
       })
-      .map((s) => String(s).trim())
       .filter(Boolean);
   }
 
-  // 3. Object dictionary e.g. { A: "...", B: "..." }
-  if (typeof raw === "object" && raw !== null) {
-    return Object.values(raw)
-      .map((opt) => {
-        if (typeof opt === "string") return opt;
-        if (typeof opt === "object" && opt !== null) {
-          return (
-            (opt as any).text ||
-            (opt as any).option ||
-            (opt as any).value ||
-            ""
-          );
-        }
-        return String(opt ?? "");
-      })
-      .map((s) => String(s).trim())
-      .filter(Boolean);
+  if (candidates.length > 0) {
+    return candidates;
   }
 
-  // 4. Separate column fallbacks (option_a, option_b, etc.)
+  // 2. CRUCIAL FOR JSS2: Fallback to separate columns
   const sep = [
-    q.option_a,
-    q.option_b,
-    q.option_c,
-    q.option_d,
-    q.option_e,
-    q.option_f,
-    q.optionA,
-    q.optionB,
-    q.optionC,
-    q.optionD,
-    q.optionE,
+    q.option_a, q.option_b, q.option_c, q.option_d, q.option_e, q.option_f,
+    q.optionA, q.optionB, q.optionC, q.optionD, q.optionE,
+    q.opt_a, q.opt_b, q.opt_c, q.opt_d,
+    q.optA, q.optB, q.optC, q.optD,
   ]
-    .filter((v) => typeof v === "string" && v.trim())
+    .filter((v) => typeof v === "string" && v.trim().length > 0)
     .map((v) => v.trim());
 
-  if (sep.length > 0) return sep;
+  if (sep.length > 0) {
+    return sep;
+  }
 
   return [];
 }
 
 /**
- * Consolidates questions from both the relational 'questions' table
- * and the 'exams.questions' / 'exams.theory_questions' JSONB columns.
+ * Accurately determines if a question is Theory or Objective.
+ */
+function isQuestionTheory(q: any, opts: string[]): boolean {
+  // If it has 2 or more options, it is strictly an OBJECTIVE question
+  if (opts.length >= 2) {
+    return false;
+  }
+
+  // If it has sub-questions, it is strictly THEORY
+  const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
+  if (subQs.length > 0) {
+    return true;
+  }
+
+  const rawType = String(q.type || "").toLowerCase().trim();
+  if (
+    rawType === "theory" ||
+    rawType === "essay" ||
+    rawType === "structured" ||
+    rawType === "subjective" ||
+    rawType === "short_answer"
+  ) {
+    return true;
+  }
+
+  if (q.is_theory === true || String(q.is_theory) === "true") {
+    return true;
+  }
+
+  const section = String(
+    q.section || q.section_header || q.sectionHeader || ""
+  ).toLowerCase();
+  if (
+    section.includes("theory") ||
+    section.includes("section b") ||
+    section.includes("part b")
+  ) {
+    return true;
+  }
+
+  // If it has no options to pick from, it is Theory
+  if (opts.length === 0) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Consolidates questions from relational tables and JSONB columns,
+ * completely preventing theory from mixing with objectives.
  */
 function consolidateExamQuestions(
   examData: any,
@@ -151,7 +259,7 @@ function consolidateExamQuestions(
   const parseJsonSafe = (raw: any): any[] => {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
-    if (typeof raw === "string") {
+    if (typeof raw === "string" && raw.trim().length > 0) {
       try {
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
@@ -162,86 +270,79 @@ function consolidateExamQuestions(
     return [];
   };
 
-  const jsonObjectives = parseJsonSafe(examData.questions);
-  const jsonTheory = parseJsonSafe(examData.theory_questions);
+  const jsonObjectives = [
+    ...parseJsonSafe(examData.questions),
+    ...parseJsonSafe(examData.objective_questions),
+    ...parseJsonSafe(examData.objectives),
+  ];
+
+  const jsonTheory = [
+    ...parseJsonSafe(examData.theory_questions),
+    ...parseJsonSafe(examData.theory),
+  ];
 
   const objMap = new Map<string, any>();
   const theoryMap = new Map<string, any>();
 
-  // Process rows from relational 'questions' table
-  for (const q of tableQuestions) {
+  const processQuestion = (q: any, fallbackPrefix: string) => {
+    if (!q) return;
     const opts = extractOptions(q);
+    const isTheory = isQuestionTheory(q, opts);
     const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
-    const isTheory =
-      q.type === "theory" ||
-      q.is_theory === true ||
-      (opts.length === 0 && subQs.length > 0);
 
-    const key = String(q.id || q.question_text || q.question);
+    const questionText =
+      q.question_text || q.question || q.prompt || q.text || "";
+    const key =
+      String(q.id || "").trim() ||
+      String(questionText).trim().toLowerCase();
+
+    if (!key) return;
 
     if (isTheory) {
-      theoryMap.set(key, {
-        ...q,
-        id: String(q.id ?? `th-${theoryMap.size}`),
-        question: q.question_text || q.question || "",
-        question_text: q.question_text || q.question || "",
-        type: "theory",
-        is_theory: true,
-        sub_questions: subQs,
-        marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
-        points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
-      });
+      if (!theoryMap.has(key)) {
+        theoryMap.set(key, {
+          ...q,
+          id: String(q.id ?? `${fallbackPrefix}-th-${theoryMap.size + 1}`),
+          question: questionText,
+          question_text: questionText,
+          type: "theory",
+          is_theory: true,
+          options: [],
+          sub_questions: subQs,
+          marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
+          points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
+        });
+      }
     } else {
-      objMap.set(key, {
-        ...q,
-        id: String(q.id ?? `obj-${objMap.size}`),
-        question: q.question_text || q.question || "",
-        question_text: q.question_text || q.question || "",
-        options: opts,
-        type: "objective",
-        is_theory: false,
-        marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
-        points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
-      });
+      if (!objMap.has(key)) {
+        objMap.set(key, {
+          ...q,
+          id: String(q.id ?? `${fallbackPrefix}-obj-${objMap.size + 1}`),
+          question: questionText,
+          question_text: questionText,
+          options: opts,
+          type: "objective",
+          is_theory: false,
+          marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
+          points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
+        });
+      }
     }
+  };
+
+  // 1. Process relational DB questions
+  for (const q of tableQuestions) {
+    processQuestion(q, "rel");
   }
 
-  // Merge JSON objectives
+  // 2. Process JSON objectives
   for (const q of jsonObjectives) {
-    const key = String(q.id || q.question || q.question_text);
-    const opts = extractOptions(q);
-    if (!objMap.has(key)) {
-      objMap.set(key, {
-        ...q,
-        id: String(q.id ?? `obj-${objMap.size}`),
-        question: q.question || q.question_text || "",
-        question_text: q.question_text || q.question || "",
-        options: opts,
-        type: "objective",
-        is_theory: false,
-        marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
-        points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
-      });
-    }
+    processQuestion(q, "json-obj");
   }
 
-  // Merge JSON theory
+  // 3. Process JSON theory
   for (const q of jsonTheory) {
-    const key = String(q.id || q.question || q.question_text);
-    const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
-    if (!theoryMap.has(key)) {
-      theoryMap.set(key, {
-        ...q,
-        id: String(q.id ?? `th-${theoryMap.size}`),
-        question: q.question || q.question_text || "",
-        question_text: q.question_text || q.question || "",
-        type: "theory",
-        is_theory: true,
-        sub_questions: subQs,
-        marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
-        points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
-      });
-    }
+    processQuestion(q, "json-th");
   }
 
   return {
@@ -252,9 +353,9 @@ function consolidateExamQuestions(
 
 /**
  * Prepares questions:
- * - Section A (Objectives) always comes first.
- * - Section B (Theory) always comes after Objectives.
- * - Only Objectives are shuffled (Languages like English/French/Yoruba are locked).
+ * - Section A (Objectives) ALWAYS comes first (Q1..Q40).
+ * - Section B (Theory) ALWAYS comes after Objectives (Q41..Q45).
+ * - Only Objectives are shuffled. Theory questions are NEVER shuffled.
  */
 function processExamQuestions(
   rawObjectives: Question[],
@@ -313,7 +414,7 @@ function processExamQuestions(
           a.question_number ??
           a.question_index ??
           a.display_order ??
-          a.display_number
+          0
       );
       const numB = Number(
         b.order_number ??
@@ -322,36 +423,31 @@ function processExamQuestions(
           b.question_number ??
           b.question_index ??
           b.display_order ??
-          b.display_number
+          0
       );
-
-      if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
-        return numA - numB;
-      }
-      return 0;
+      return numA - numB;
     });
   }
 
-  // 2. Process Theory (Section B)
+  // 2. Process Theory (Section B) - NEVER SHUFFLED
   const orderedTheory = [...rawTheory].sort((a: any, b: any) => {
     const numA = Number(
       a.order_number ??
         a.order_index ??
         a.question_number ??
         a.question_index ??
-        a.display_number
+        a.display_order ??
+        0
     );
     const numB = Number(
       b.order_number ??
         b.order_index ??
         b.question_number ??
         b.question_index ??
-        b.display_number
+        b.display_order ??
+        0
     );
-    if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
-      return numA - numB;
-    }
-    return 0;
+    return numA - numB;
   });
 
   // 3. Assemble: Objectives first (Q1..Q40), then Theory (Q41..Q45)
@@ -429,15 +525,14 @@ export function useExamLoader(
       }
       setExam(examData);
 
-      // 4. Relational Questions Table Fetch (Guarantees objectives are loaded)
+      // 4. Relational Questions Table Fetch (Safe for JSS2 and all levels)
       const supabase = createClient();
       let tableQuestions: any[] = [];
       try {
         const { data: qRows, error: qErr } = await supabase
           .from("questions")
           .select("*")
-          .eq("exam_id", examId)
-          .order("order_number", { ascending: true });
+          .eq("exam_id", examId);
 
         if (!qErr && Array.isArray(qRows)) {
           tableQuestions = qRows;
@@ -456,7 +551,7 @@ export function useExamLoader(
         examData.subject || (examData as any).subject_name || "";
       const examTitle = examData.title || "";
 
-      // 6. Section A & Section B arrangement with option extraction
+      // 6. Section A (Objectives) & Section B (Theory) arrangement
       const processedQuestions = processExamQuestions(
         objectiveQuestions,
         theoryQuestions,
@@ -484,8 +579,8 @@ export function useExamLoader(
           : 0;
       const actualTotalMarks = objectiveMax + theoryMax;
 
-      // 7. Dynamic Duration Resolution
-      const dynamicDuration = resolveExamDuration(examData);
+      // 7. Dynamic Teacher Duration (Directly picks 90, 120, etc.)
+      const dynamicDuration = getTeacherExamDuration(examData);
 
       // 8. Attempts Resolution
       const allAttempts = await fetchAttempts(
@@ -539,9 +634,7 @@ export function useExamLoader(
 
         const originalStartedAt = latest.started_at;
         if (!originalStartedAt) {
-          toast.error(
-            "Exam data corrupted — missing start time. Contact support."
-          );
+          toast.error("Exam data corrupted — missing start time. Contact support.");
           return;
         }
 

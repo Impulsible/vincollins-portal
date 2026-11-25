@@ -47,14 +47,17 @@ type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
 // SAFE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Strips marks tags including decimal marks like "Marks: 0.5", "(0.5 marks)", "[1.5 marks]"
+ */
 const removeMarksFromText = (text: string): string => {
   if (!text) return "";
   return text
     .replace(/Marks?\s*:\s*\d+(?:\.\d+)?/gi, "")
-    .replace(/\[\s*\d+\s*marks?\s*\]/gi, "")
-    .replace(/\(\s*\d+\s*marks?\s*\)/gi, "")
-    .replace(/\s*\d+\s*marks?\s*$/gi, "")
-    .replace(/\n\s*\d+\s*marks?\s*\n/gi, "\n")
+    .replace(/\[\s*\d+(?:\.\d+)?\s*marks?\s*\]/gi, "")
+    .replace(/\(\s*\d+(?:\.\d+)?\s*marks?\s*\)/gi, "")
+    .replace(/\s*\d+(?:\.\d+)?\s*marks?\s*$/gi, "")
+    .replace(/\n\s*\d+(?:\.\d+)?\s*marks?\s*\n/gi, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 };
@@ -87,8 +90,8 @@ function extractQuestionOptions(question: any): string[] {
   }
 
   // 2. If options is an array
-  if (Array.isArray(raw)) {
-    return raw
+  if (Array.isArray(raw) && raw.length > 0) {
+    const parsed = raw
       .map((opt) => {
         if (typeof opt === "string") return cleanOptionText(opt);
         if (typeof opt === "number") return String(opt);
@@ -98,11 +101,13 @@ function extractQuestionOptions(question: any): string[] {
         return "";
       })
       .filter((opt) => opt.length > 0);
+
+    if (parsed.length > 0) return parsed;
   }
 
   // 3. If options is an object map like { A: "...", B: "..." }
-  if (typeof raw === "object" && raw !== null) {
-    return Object.values(raw)
+  if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+    const parsed = Object.values(raw)
       .map((opt) => {
         if (typeof opt === "string") return cleanOptionText(opt);
         if (typeof opt === "object" && opt !== null) {
@@ -111,13 +116,16 @@ function extractQuestionOptions(question: any): string[] {
         return cleanOptionText(String(opt));
       })
       .filter((opt) => opt.length > 0);
+
+    if (parsed.length > 0) return parsed;
   }
 
-  // 4. If separate fields (option_a, option_b, option_c, option_d, etc.)
+  // 4. Fallback to separate fields (option_a, option_b, option_c, option_d, etc.)
   const separate: string[] = [];
   const keys = [
     "option_a", "option_b", "option_c", "option_d", "option_e", "option_f",
-    "optionA", "optionB", "optionC", "optionD", "optionE"
+    "optionA", "optionB", "optionC", "optionD", "optionE",
+    "opt_a", "opt_b", "opt_c", "opt_d"
   ];
   for (const k of keys) {
     if (question[k] && typeof question[k] === "string" && question[k].trim()) {
@@ -298,6 +306,10 @@ function ObjectiveQuestionCard({
     (question as any)?.instruction ||
     (question as any)?.instructions;
 
+  // Format marks display: 0.5 marks, 1 mark, 2 marks
+  const formattedMarks = Number(marks);
+  const markLabel = formattedMarks === 1 ? "mark" : "marks";
+
   return (
     <div className="relative rounded-3xl border border-indigo-200/70 dark:border-indigo-800/50 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
       <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
@@ -326,8 +338,8 @@ function ObjectiveQuestionCard({
                 <ImageIcon className="h-3 w-3" /> Diagram
               </Badge>
             )}
-            <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-xs font-bold ring-1 ring-white/20">
-              {marks} mk{marks !== 1 ? "s" : ""}
+            <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-xs font-bold ring-1 ring-white/20 tabular-nums">
+              {formattedMarks} {markLabel}
             </Badge>
             <div className="px-2.5 py-1 rounded-lg bg-black/20 backdrop-blur-sm">
               <span className="text-white text-[11px] font-bold">
@@ -687,13 +699,25 @@ export function ExamInterface({
     });
   }, [currentQuestion]);
 
-  // If question has options, it is ALWAYS an objective question!
-  const hasOptions = currentOptions.length > 0;
-  const isTheory =
-    !hasOptions &&
-    (currentQuestion?.type === "theory" ||
-      currentQuestion?.is_theory === true ||
-      currentSubQuestions.length > 0);
+  // Robust check if question is theory
+  const hasOptions = currentOptions.length >= 2;
+  const isTheory = useMemo(() => {
+    if (!currentQuestion) return false;
+    if (hasOptions) return false; // Multiple-choice options guarantee objective
+
+    const qType = String(currentQuestion.type || "").toLowerCase();
+    const qSubType = String((currentQuestion as any).question_type || "").toLowerCase();
+
+    return (
+      qType === "theory" ||
+      qType === "essay" ||
+      qSubType === "theory" ||
+      qSubType === "essay" ||
+      currentQuestion.is_theory === true ||
+      currentSubQuestions.length > 0 ||
+      currentOptions.length === 0
+    );
+  }, [currentQuestion, hasOptions, currentSubQuestions.length, currentOptions.length]);
 
   const isLast = currentIndex === allQuestions.length - 1;
   const isFirst = currentIndex === 0;
@@ -731,8 +755,21 @@ export function ExamInterface({
     typeof studentName === "string" && studentName.trim().length > 0
       ? studentName.trim().charAt(0).toUpperCase()
       : "S";
+
+  // Fallback for passage text columns
   const passageText =
-    typeof exam?.passage_text === "string" ? exam.passage_text : "";
+    typeof exam?.passage_text === "string" && exam.passage_text.trim()
+      ? exam.passage_text
+      : typeof (exam as any)?.reading_passage === "string" && (exam as any).reading_passage.trim()
+      ? (exam as any).reading_passage
+      : typeof (exam as any)?.passage === "string"
+      ? (exam as any).passage
+      : "";
+
+  // Accurate question marks parsing (preserves 0.5 for objectives, 10 for theories)
+  const resolvedMarks = Number(
+    currentQuestion.marks ?? currentQuestion.points ?? (isTheory ? 10 : 0.5)
+  );
 
   const theoryQuestionData = {
     id: currentQuestion.id,
@@ -748,12 +785,7 @@ export function ExamInterface({
         : typeof currentQuestion.question === "string"
         ? currentQuestion.question
         : "",
-    marks:
-      typeof currentQuestion.marks === "number"
-        ? currentQuestion.marks
-        : typeof currentQuestion.points === "number"
-        ? currentQuestion.points
-        : 10,
+    marks: resolvedMarks,
     section_header:
       (currentQuestion as any).section_header ||
       (currentQuestion as any).sectionHeader ||
@@ -924,7 +956,7 @@ export function ExamInterface({
                     onAnswer={(value: string) =>
                       onUpdateAnswer(currentQuestion.id, value)
                     }
-                    marks={currentQuestion.marks || currentQuestion.points || 1}
+                    marks={resolvedMarks}
                   />
                 )}
               </motion.div>
