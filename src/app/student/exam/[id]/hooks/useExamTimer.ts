@@ -45,6 +45,7 @@ export function useExamTimer({
   attemptId,
   onTimeSync,
 }: ExamTimerOptions) {
+  // Strictly enforce the teacher's duration without phantom extensions
   const totalSeconds = Math.max(0, Math.floor(durationMinutes * 60))
 
   const [timeLeft, setTimeLeft] = useState<number>(() => {
@@ -77,7 +78,7 @@ export function useExamTimer({
   useEffect(() => { onTimeWarningRef.current = onTimeWarning }, [onTimeWarning])
   useEffect(() => { onTimeSyncRef.current = onTimeSync }, [onTimeSync])
 
-  // ✅ Fixed duration prop updates without double-counting extra 60 mins
+  // Sync duration directly from props (NEVER add 60 mins)
   useEffect(() => {
     const next = Math.max(0, Math.floor(durationMinutes * 60))
     durationSecondsRef.current = next
@@ -93,6 +94,8 @@ export function useExamTimer({
         setIsTimeUp(false)
         if (stoppedRef.current) stoppedRef.current = false
       }
+    } else {
+      setTimeLeft(next + extensionSecondsRef.current)
     }
   }, [durationMinutes])
 
