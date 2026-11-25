@@ -59,6 +59,40 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
+ * Safely parses marks as floating point numbers without rounding (preserves 0.5).
+ */
+function parseMark(val: any, fallback: number): number {
+  if (val === null || val === undefined || val === "") return fallback;
+  const num = Number(val);
+  return Number.isFinite(num) && num > 0 ? num : fallback;
+}
+
+/**
+ * Strips accidental trailing "Marks: 0.5" or "[1 mark]" appended to the question text.
+ */
+function cleanQuestionText(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .replace(/\s*\(?\s*marks?:\s*\d+(\.\d+)?\s*\)?\s*$/i, "")
+    .replace(/\s*\[\s*\d+(\.\d+)?\s*marks?\s*\]\s*$/i, "")
+    .replace(/\s*\(\s*\d+(\.\d+)?\s*marks?\s*\)\s*$/i, "")
+    .trim();
+}
+
+/**
+ * Normalizes question text into a signature for deduplication.
+ * Strips question numbering (e.g. "1.", "1a.", "(a)"), punctuation, and spacing.
+ */
+function getQuestionSignature(text: string): string {
+  return (text || "")
+    .toLowerCase()
+    .replace(/<[^>]*>/g, "")
+    .replace(/^\s*(question\s*)?[0-9]+[\.\)\:\-]?\s*(\([a-z0-9]+\))?\s*/i, "")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 100);
+}
+
+/**
  * Robustly resolves the exam duration in minutes directly from whatever 
  * the teacher set (90, 120, 45, etc.), overcoming database default mismatches.
  */
@@ -71,7 +105,6 @@ export function getTeacherExamDuration(exam: any): number {
   const candidates = [colA, colB].filter((n) => Number.isFinite(n) && n > 0);
 
   if (candidates.length > 0) {
-    // If one column is the 60 min default and the other is what the teacher set (e.g. 90 or 120)
     if (candidates.length > 1 && candidates.includes(60)) {
       const teacherCustomTime = candidates.find((c) => c !== 60);
       if (teacherCustomTime) {
@@ -81,12 +114,11 @@ export function getTeacherExamDuration(exam: any): number {
 
     const primary = candidates[0];
     if (primary > 0 && primary <= 4) {
-      return Math.round(primary * 60); // E.g., 2 (hours) -> 120 minutes
+      return Math.round(primary * 60);
     }
     return Math.round(primary);
   }
 
-  // Fallback check for string descriptions like "90 mins" or "2 hours"
   const raw =
     exam.time_limit_minutes ??
     exam.time_limit ??
@@ -116,13 +148,11 @@ export function getTeacherExamDuration(exam: any): number {
 /**
  * Safely extracts options from Arrays, JSON strings, Objects, 
  * or separate columns (option_a, option_b, etc.).
- * Ensures JSS2 and column-based objective questions are never missed.
  */
 function extractOptions(q: any): string[] {
   if (!q) return [];
   let candidates: string[] = [];
 
-  // 1. Try options / choices field
   let raw = q.options ?? q.choices ?? q.answers;
 
   if (typeof raw === "string" && raw.trim().length > 0) {
@@ -135,7 +165,6 @@ function extractOptions(q: any): string[] {
     }
   }
 
-  // Handle parsed array
   if (Array.isArray(raw) && raw.length > 0) {
     candidates = raw
       .map((opt) => {
@@ -157,7 +186,6 @@ function extractOptions(q: any): string[] {
       })
       .filter(Boolean);
   } else if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
-    // Handle dictionary objects { A: "...", B: "..." }
     candidates = Object.values(raw)
       .map((opt) => {
         if (typeof opt === "string") return opt.trim();
@@ -179,7 +207,6 @@ function extractOptions(q: any): string[] {
     return candidates;
   }
 
-  // 2. CRUCIAL FOR JSS2: Fallback to separate columns
   const sep = [
     q.option_a, q.option_b, q.option_c, q.option_d, q.option_e, q.option_f,
     q.optionA, q.optionB, q.optionC, q.optionD, q.optionE,
@@ -200,12 +227,10 @@ function extractOptions(q: any): string[] {
  * Accurately determines if a question is Theory or Objective.
  */
 function isQuestionTheory(q: any, opts: string[]): boolean {
-  // If it has 2 or more options, it is strictly an OBJECTIVE question
   if (opts.length >= 2) {
     return false;
   }
 
-  // If it has sub-questions, it is strictly THEORY
   const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
   if (subQs.length > 0) {
     return true;
@@ -237,7 +262,6 @@ function isQuestionTheory(q: any, opts: string[]): boolean {
     return true;
   }
 
-  // If it has no options to pick from, it is Theory
   if (opts.length === 0) {
     return true;
   }
@@ -246,8 +270,7 @@ function isQuestionTheory(q: any, opts: string[]): boolean {
 }
 
 /**
- * Consolidates questions from relational tables and JSONB columns,
- * completely preventing theory from mixing with objectives.
+ * Consolidates questions without duplicate theory or objective rows.
  */
 function consolidateExamQuestions(
   examData: any,
@@ -271,18 +294,21 @@ function consolidateExamQuestions(
   };
 
   const jsonObjectives = [
-    ...parseJsonSafe(examData.questions),
-    ...parseJsonSafe(examData.objective_questions),
-    ...parseJsonSafe(examData.objectives),
+    ...parseJsonSafe(examData?.questions),
+    ...parseJsonSafe(examData?.objective_questions),
+    ...parseJsonSafe(examData?.objectives),
   ];
 
   const jsonTheory = [
-    ...parseJsonSafe(examData.theory_questions),
-    ...parseJsonSafe(examData.theory),
+    ...parseJsonSafe(examData?.theory_questions),
+    ...parseJsonSafe(examData?.theory),
   ];
 
   const objMap = new Map<string, any>();
   const theoryMap = new Map<string, any>();
+
+  const seenObjSignatures = new Set<string>();
+  const seenTheorySignatures = new Set<string>();
 
   const processQuestion = (q: any, fallbackPrefix: string) => {
     if (!q) return;
@@ -290,59 +316,76 @@ function consolidateExamQuestions(
     const isTheory = isQuestionTheory(q, opts);
     const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
 
-    const questionText =
-      q.question_text || q.question || q.prompt || q.text || "";
-    const key =
-      String(q.id || "").trim() ||
-      String(questionText).trim().toLowerCase();
+    const rawText = q.question_text || q.question || q.prompt || q.text || "";
+    const questionText = cleanQuestionText(rawText);
+    const signature = getQuestionSignature(questionText);
 
-    if (!key) return;
+    // Reject non-question instruction headers (e.g. "SECTION B: THEORY INSTRUCTIONS")
+    const isInstructionHeader =
+      questionText.length < 150 &&
+      /^(section\s+[ab]|instructions?|part\s+[ab])\s*[:\-]/i.test(questionText.trim()) &&
+      !/(what|define|explain|list|calculate|state|describe|discuss|mention|name|differentiate|solve|convert|simplify)/i.test(questionText);
+
+    if (isInstructionHeader) return;
 
     if (isTheory) {
-      if (!theoryMap.has(key)) {
-        theoryMap.set(key, {
-          ...q,
-          id: String(q.id ?? `${fallbackPrefix}-th-${theoryMap.size + 1}`),
-          question: questionText,
-          question_text: questionText,
-          type: "theory",
-          is_theory: true,
-          options: [],
-          sub_questions: subQs,
-          marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
-          points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
-        });
-      }
+      // Deduplicate by text signature to guarantee no duplicates
+      if (signature && seenTheorySignatures.has(signature)) return;
+      if (signature) seenTheorySignatures.add(signature);
+
+      const key = String(q.id || `${fallbackPrefix}-th-${theoryMap.size + 1}`);
+      const theoryMarks = parseMark(q.marks ?? q.points, 10.0);
+
+      theoryMap.set(key, {
+        ...q,
+        id: key,
+        question: questionText,
+        question_text: questionText,
+        type: "theory",
+        is_theory: true,
+        options: [],
+        sub_questions: subQs,
+        marks: theoryMarks,
+        points: theoryMarks,
+      });
     } else {
-      if (!objMap.has(key)) {
-        objMap.set(key, {
-          ...q,
-          id: String(q.id ?? `${fallbackPrefix}-obj-${objMap.size + 1}`),
-          question: questionText,
-          question_text: questionText,
-          options: opts,
-          type: "objective",
-          is_theory: false,
-          marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
-          points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
-        });
-      }
+      if (signature && seenObjSignatures.has(signature)) return;
+      if (signature) seenObjSignatures.add(signature);
+
+      const key = String(q.id || `${fallbackPrefix}-obj-${objMap.size + 1}`);
+      const objMarks = parseMark(q.marks ?? q.points, 0.5);
+
+      objMap.set(key, {
+        ...q,
+        id: key,
+        question: questionText,
+        question_text: questionText,
+        options: opts,
+        type: "objective",
+        is_theory: false,
+        marks: objMarks,
+        points: objMarks,
+      });
     }
   };
 
-  // 1. Process relational DB questions
+  // 1. Process relational DB questions first (Primary Source of Truth)
   for (const q of tableQuestions) {
     processQuestion(q, "rel");
   }
 
-  // 2. Process JSON objectives
-  for (const q of jsonObjectives) {
-    processQuestion(q, "json-obj");
+  // 2. ONLY fallback to JSON columns if relational table had 0 objectives
+  if (objMap.size === 0) {
+    for (const q of jsonObjectives) {
+      processQuestion(q, "json-obj");
+    }
   }
 
-  // 3. Process JSON theory
-  for (const q of jsonTheory) {
-    processQuestion(q, "json-th");
+  // 3. ONLY fallback to JSON columns if relational table had 0 theory questions
+  if (theoryMap.size === 0) {
+    for (const q of jsonTheory) {
+      processQuestion(q, "json-th");
+    }
   }
 
   return {
@@ -354,7 +397,7 @@ function consolidateExamQuestions(
 /**
  * Prepares questions:
  * - Section A (Objectives) ALWAYS comes first (Q1..Q40).
- * - Section B (Theory) ALWAYS comes after Objectives (Q41..Q45).
+ * - Section B (Theory) ALWAYS comes after Objectives (Q41..Q46).
  * - Only Objectives are shuffled. Theory questions are NEVER shuffled.
  */
 function processExamQuestions(
@@ -450,7 +493,7 @@ function processExamQuestions(
     return numA - numB;
   });
 
-  // 3. Assemble: Objectives first (Q1..Q40), then Theory (Q41..Q45)
+  // 3. Assemble: Objectives first (Q1..Q40), then Theory (Q41..Q46)
   const allTogether = [...orderedObjectives, ...orderedTheory];
 
   return allTogether.map((q, index) => {
@@ -525,7 +568,7 @@ export function useExamLoader(
       }
       setExam(examData);
 
-      // 4. Relational Questions Table Fetch (Safe for JSS2 and all levels)
+      // 4. Relational Questions Table Fetch (Filter out soft-deleted & draft questions)
       const supabase = createClient();
       let tableQuestions: any[] = [];
       try {
@@ -535,7 +578,7 @@ export function useExamLoader(
           .eq("exam_id", examId);
 
         if (!qErr && Array.isArray(qRows)) {
-          tableQuestions = qRows;
+          tableQuestions = qRows.filter((q: any) => !q.deleted_at && q.is_draft !== true);
         }
       } catch (err) {
         console.warn("[useExamLoader] Failed to read relational questions:", err);
@@ -572,14 +615,23 @@ export function useExamLoader(
       const objectiveCount = objectiveQuestions.length;
       const theoryCount = theoryQuestions.length;
 
-      const objectiveMax = objectiveCount || examData.objective_max || 20;
-      const theoryMax =
-        theoryCount > 0
-          ? examData.theory_max ?? Math.max(0, 60 - objectiveMax)
-          : 0;
-      const actualTotalMarks = objectiveMax + theoryMax;
+      // Teacher's explicit max marks (Default: 20 max for objectives, 40 max for theory)
+      const teacherObjMax = Number(examData.objective_max);
+      const objectiveMax = Number.isFinite(teacherObjMax) && teacherObjMax > 0 
+        ? teacherObjMax 
+        : (objectiveCount * 0.5);
 
-      // 7. Dynamic Teacher Duration (Directly picks 90, 120, etc.)
+      const teacherTheoryMax = Number(examData.theory_max);
+      const theoryMax = theoryCount > 0
+        ? (Number.isFinite(teacherTheoryMax) && teacherTheoryMax > 0 ? teacherTheoryMax : Math.max(0, 60 - objectiveMax))
+        : 0;
+
+      const teacherTotal = Number(examData.total_marks);
+      const actualTotalMarks = Number.isFinite(teacherTotal) && teacherTotal > 0
+        ? teacherTotal
+        : (objectiveMax + theoryMax);
+
+      // 7. Dynamic Teacher Duration
       const dynamicDuration = getTeacherExamDuration(examData);
 
       // 8. Attempts Resolution
@@ -763,12 +815,21 @@ export function useExamLoader(
         const theoCount = allQuestions.filter(
           (q) => q.type === "theory"
         ).length;
-        const objectiveMax = objCount || exam.objective_max || 20;
-        const theoryMax =
-          theoCount > 0
-            ? exam.theory_max ?? Math.max(0, 60 - objectiveMax)
-            : 0;
-        const actualTotalMarks = objectiveMax + theoryMax;
+
+        const teacherObjMax = Number(exam.objective_max);
+        const objectiveMax = Number.isFinite(teacherObjMax) && teacherObjMax > 0 
+          ? teacherObjMax 
+          : (objCount * 0.5);
+
+        const teacherTheoryMax = Number(exam.theory_max);
+        const theoryMax = theoCount > 0
+          ? (Number.isFinite(teacherTheoryMax) && teacherTheoryMax > 0 ? teacherTheoryMax : Math.max(0, 60 - objectiveMax))
+          : 0;
+
+        const teacherTotal = Number(exam.total_marks);
+        const actualTotalMarks = Number.isFinite(teacherTotal) && teacherTotal > 0
+          ? teacherTotal
+          : (objectiveMax + theoryMax);
 
         setExamTerminated(false);
         return await createAttempt({
