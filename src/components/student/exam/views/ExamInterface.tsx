@@ -44,7 +44,7 @@ import {
 type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
+// SAFE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
 const removeMarksFromText = (text: string): string => {
@@ -60,23 +60,79 @@ const removeMarksFromText = (text: string): string => {
 };
 
 /**
- * Strips section dividers, trailing headers, or markdown leaks that accidentally
- * attached to the end of an option choice (e.g. Option D).
+ * Strips markdown trailing section dividers without deleting valid option text
  */
 const cleanOptionText = (text: string): string => {
   if (!text) return "";
   return text
-    .replace(
-      /\s*(?:---|___|\*\*\*|===|##+|###+|SECTION\b|PART\b|OBJECTIVES?\b|THEORY\b|INSTRUCTIONS?\b|DIRECTIONS?\b|CHOISISSEZ\b|CHOOSE\b|READ\b)[\s\S]*$/i,
-      ""
-    )
+    .replace(/\n\s*(?:---|___|\*\*\*|===|###+|SECTION\s+[A-Z]|PART\s+[A-Z]|THEORY\s+QUESTIONS?)[\s\S]*$/i, "")
     .trim();
 };
+
+/**
+ * Robustly normalizes options from arrays, JSON strings, object maps, or separate option fields
+ */
+function extractQuestionOptions(question: any): string[] {
+  if (!question) return [];
+
+  let raw = question.options;
+
+  // 1. If options is a stringified JSON string
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = raw.split(/\n|,/).map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+
+  // 2. If options is an array
+  if (Array.isArray(raw)) {
+    return raw
+      .map((opt) => {
+        if (typeof opt === "string") return cleanOptionText(opt);
+        if (typeof opt === "number") return String(opt);
+        if (typeof opt === "object" && opt !== null) {
+          return cleanOptionText(opt.text || opt.option || opt.value || opt.label || opt.content || "");
+        }
+        return "";
+      })
+      .filter((opt) => opt.length > 0);
+  }
+
+  // 3. If options is an object map like { A: "...", B: "..." }
+  if (typeof raw === "object" && raw !== null) {
+    return Object.values(raw)
+      .map((opt) => {
+        if (typeof opt === "string") return cleanOptionText(opt);
+        if (typeof opt === "object" && opt !== null) {
+          return cleanOptionText((opt as any).text || (opt as any).option || (opt as any).value || "");
+        }
+        return cleanOptionText(String(opt));
+      })
+      .filter((opt) => opt.length > 0);
+  }
+
+  // 4. If separate fields (option_a, option_b, option_c, option_d, etc.)
+  const separate: string[] = [];
+  const keys = [
+    "option_a", "option_b", "option_c", "option_d", "option_e", "option_f",
+    "optionA", "optionB", "optionC", "optionD", "optionE"
+  ];
+  for (const k of keys) {
+    if (question[k] && typeof question[k] === "string" && question[k].trim()) {
+      separate.push(cleanOptionText(question[k].trim()));
+    }
+  }
+  if (separate.length > 0) return separate;
+
+  return [];
+}
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COLLAPSIBLE READING PASSAGE DOCK (PERSISTENT VIA LOCALSTORAGE)
+// COLLAPSIBLE READING PASSAGE DOCK
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ReadingPassageDock({
@@ -94,7 +150,6 @@ function ReadingPassageDock({
 
   const readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 180));
 
-  // Extract brief snippet for collapsed preview
   const snippet = useMemo(() => {
     const clean = passageText.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ");
     return clean.length > 120 ? `${clean.slice(0, 120)}…` : clean;
@@ -106,7 +161,6 @@ function ReadingPassageDock({
         <div className="absolute -top-16 -right-16 h-40 w-40 bg-orange-300/30 dark:bg-orange-800/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-amber-300/30 dark:bg-amber-800/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* ── PASSAGE HEADER (Always Visible & Clickable) ── */}
         <div
           onClick={onToggle}
           className="relative px-5 py-3.5 sm:px-6 flex items-center justify-between cursor-pointer select-none hover:bg-amber-100/40 dark:hover:bg-amber-950/50 transition-colors"
@@ -171,7 +225,6 @@ function ReadingPassageDock({
           </div>
         </div>
 
-        {/* ── EXPANDABLE PASSAGE CONTENT ── */}
         <AnimatePresence initial={false}>
           {isExpanded && (
             <motion.div
@@ -208,7 +261,7 @@ function ReadingPassageDock({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBJECTIVE QUESTION CARD (WITH SECTION SUB-HEADER, TABLE & DIAGRAM SUPPORT)
+// OBJECTIVE QUESTION CARD
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ObjectiveQuestionCard({
@@ -224,18 +277,20 @@ function ObjectiveQuestionCard({
   onAnswer: (v: string) => void;
   marks: number;
 }) {
-  const rawQuestionText = question?.question || question?.question_text || "";
+  const rawQuestionText =
+    question?.question ||
+    question?.question_text ||
+    (question as any)?.text ||
+    (question as any)?.prompt ||
+    "";
   const cleanedText = removeMarksFromText(rawQuestionText);
-  
-  // Clean each option choice to prevent leaked dividers/headings from rendering inside pills
-  const options: string[] = (question?.options || [])
-    .filter(Boolean)
-    .map((opt) => cleanOptionText(String(opt)));
+
+  // Safe normalized options
+  const options = extractQuestionOptions(question);
 
   const imageUrl = question?.image_url || (question as any)?.imageUrl;
   const imageCaption = question?.image_caption || (question as any)?.imageCaption;
 
-  // Authoritative Section Header / Sub-Header parsed from objective text
   const sectionHeader =
     (question as any)?.section_header ||
     (question as any)?.sectionHeader ||
@@ -285,7 +340,6 @@ function ObjectiveQuestionCard({
 
       {/* Card Content Body */}
       <div className="p-5 sm:p-6 space-y-5">
-        {/* SECTION / SUB-HEADER BANNER (e.g., Section A, French/Yoruba Instructions) */}
         {sectionHeader && (
           <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-yellow-500/10 dark:from-amber-950/40 dark:via-orange-950/20 dark:to-yellow-950/30 border-l-4 border-amber-500 dark:border-amber-400 border-y border-r border-amber-200/60 dark:border-amber-900/40 text-amber-950 dark:text-amber-200 shadow-2xs">
             <Layers className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -310,79 +364,85 @@ function ObjectiveQuestionCard({
           </div>
         </div>
 
-        {/* Option Choices: Dynamic Grid based on choices (2 to 8 choices) */}
-        <div
-          className={cn(
-            "gap-2.5 pl-0 sm:pl-11 grid",
-            options.length <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
-          )}
-        >
-          {options.map((option, idx) => {
-            const selected = answer === option;
-            const letter = OPTION_LETTERS[idx] || String.fromCharCode(65 + idx);
+        {/* Dynamic Options Grid */}
+        {options.length > 0 ? (
+          <div
+            className={cn(
+              "gap-2.5 pl-0 sm:pl-11 grid",
+              options.length <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+            )}
+          >
+            {options.map((option, idx) => {
+              const selected = answer === option;
+              const letter = OPTION_LETTERS[idx] || String.fromCharCode(65 + idx);
 
-            return (
-              <motion.label
-                key={idx}
-                whileTap={{ scale: 0.99 }}
-                className={cn(
-                  "group relative flex items-start gap-3.5 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 select-none overflow-hidden",
-                  selected
-                    ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-50/90 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/30 shadow-md shadow-indigo-500/10"
-                    : "border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900"
-                )}
-              >
-                {selected && (
-                  <div className="absolute top-0 right-0 h-full w-1.5 bg-gradient-to-b from-indigo-500 to-blue-500" />
-                )}
-
-                {/* Radio Indicator */}
-                <div
+              return (
+                <motion.label
+                  key={idx}
+                  whileTap={{ scale: 0.99 }}
                   className={cn(
-                    "flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                    "group relative flex items-start gap-3.5 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 select-none overflow-hidden",
                     selected
-                      ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-500 to-blue-500 shadow-sm"
-                      : "border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500 bg-white dark:bg-slate-800"
+                      ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-50/90 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/30 shadow-md shadow-indigo-500/10"
+                      : "border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900"
                   )}
                 >
                   {selected && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="w-2.5 h-2.5 rounded-full bg-white"
-                    />
+                    <div className="absolute top-0 right-0 h-full w-1.5 bg-gradient-to-b from-indigo-500 to-blue-500" />
                   )}
-                </div>
 
-                <input
-                  type="radio"
-                  name={`q-${question.id}`}
-                  value={option}
-                  checked={selected}
-                  onChange={(e) => onAnswer(e.target.value)}
-                  className="sr-only"
-                />
-
-                {/* Option Letter & Formatted Text */}
-                <div className="flex-1 flex items-start gap-3 min-w-0">
-                  <span
+                  {/* Radio Indicator */}
+                  <div
                     className={cn(
-                      "flex-shrink-0 h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-bold flex items-center justify-center transition-all",
+                      "flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
                       selected
-                        ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+                        ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-500 to-blue-500 shadow-sm"
+                        : "border-slate-300 dark:border-slate-600 group-hover:border-indigo-400 dark:group-hover:border-indigo-500 bg-white dark:bg-slate-800"
                     )}
                   >
-                    {letter}
-                  </span>
-                  <div className="flex-1 min-w-0 pt-0.5">
-                    <QuestionContent text={option} />
+                    {selected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="w-2.5 h-2.5 rounded-full bg-white"
+                      />
+                    )}
                   </div>
-                </div>
-              </motion.label>
-            );
-          })}
-        </div>
+
+                  <input
+                    type="radio"
+                    name={`q-${question.id}`}
+                    value={option}
+                    checked={selected}
+                    onChange={(e) => onAnswer(e.target.value)}
+                    className="sr-only"
+                  />
+
+                  {/* Option Letter & Formatted Text */}
+                  <div className="flex-1 flex items-start gap-3 min-w-0">
+                    <span
+                      className={cn(
+                        "flex-shrink-0 h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-bold flex items-center justify-center transition-all",
+                        selected
+                          ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+                      )}
+                    >
+                      {letter}
+                    </span>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <QuestionContent text={option} />
+                    </div>
+                  </div>
+                </motion.label>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs">
+            No options available for this question.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -576,12 +636,10 @@ export function ExamInterface({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [passageExpanded, setPassageExpanded] = useState(true);
 
-  // ── Persistence Key for Reading Passage ──
   const passageStorageKey = useMemo(() => {
     return `cbt_passage_expanded_${exam?.id || "default"}`;
   }, [exam?.id]);
 
-  // Load manual minimize/expand preference from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -589,7 +647,6 @@ export function ExamInterface({
       if (stored !== null) {
         setPassageExpanded(JSON.parse(stored) === true);
       } else {
-        // Defaults to expanded if student never manually changed it
         setPassageExpanded(true);
       }
     } catch {
@@ -597,7 +654,6 @@ export function ExamInterface({
     }
   }, [passageStorageKey]);
 
-  // Handle manual toggle and persist to localStorage
   const handleTogglePassage = useCallback(() => {
     setPassageExpanded((prev) => {
       const next = !prev;
@@ -617,16 +673,27 @@ export function ExamInterface({
     ? flaggedQuestions.has(currentQuestion.id)
     : false;
 
-  const currentSubQuestions: TheorySubQuestion[] = Array.isArray(
-    currentQuestion?.sub_questions
-  )
-    ? (currentQuestion.sub_questions as TheorySubQuestion[])
-    : [];
+  // Extract options and sub-questions safely
+  const currentOptions = useMemo(() => {
+    return extractQuestionOptions(currentQuestion);
+  }, [currentQuestion]);
 
+  const currentSubQuestions: TheorySubQuestion[] = useMemo(() => {
+    if (!currentQuestion || !Array.isArray(currentQuestion.sub_questions)) return [];
+    return (currentQuestion.sub_questions as any[]).filter((sq) => {
+      if (!sq) return false;
+      if (typeof sq === "string") return sq.trim().length > 0;
+      return Boolean(sq.question || sq.question_text || sq.text);
+    });
+  }, [currentQuestion]);
+
+  // If question has options, it is ALWAYS an objective question!
+  const hasOptions = currentOptions.length > 0;
   const isTheory =
-    currentQuestion?.type === "theory" ||
-    currentQuestion?.is_theory === true ||
-    currentSubQuestions.length > 0;
+    !hasOptions &&
+    (currentQuestion?.type === "theory" ||
+      currentQuestion?.is_theory === true ||
+      currentSubQuestions.length > 0);
 
   const isLast = currentIndex === allQuestions.length - 1;
   const isFirst = currentIndex === 0;
@@ -857,7 +924,7 @@ export function ExamInterface({
                     onAnswer={(value: string) =>
                       onUpdateAnswer(currentQuestion.id, value)
                     }
-                    marks={currentQuestion.marks || 0.5}
+                    marks={currentQuestion.marks || currentQuestion.points || 1}
                   />
                 )}
               </motion.div>

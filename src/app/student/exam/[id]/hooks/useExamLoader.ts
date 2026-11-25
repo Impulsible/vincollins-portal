@@ -1,10 +1,11 @@
+// src/app/student/exam/[id]/hooks/useExamLoader.ts
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 import { calculateScore } from "../utils/scoring";
-import { normalizeExamQuestions } from "../utils/questionNormalizer";
 import {
   isSubjectExcludedFromShuffle,
   hasRelativeOptions,
@@ -59,31 +60,220 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Prepares and normalizes questions and options per subject and content rules:
- * - Languages & Reasoning (Yoruba, French, English, etc.): STRICT LOCK (Questions and Options never shuffle).
- * - Maths / Sciences / Others: Full question and option shuffle.
- * - Relative Options ("All/None of the above"): Locks option order for that question.
+ * Safely extracts options from Arrays, JSON strings, Objects, or separate columns
+ */
+function extractOptions(q: any): string[] {
+  if (!q) return [];
+  let raw = q.options ?? q.choices;
+
+  // 1. JSON String parsing
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      raw = raw.split(/\n|,/).map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+
+  // 2. Standard Array
+  if (Array.isArray(raw)) {
+    return raw
+      .map((opt) => {
+        if (typeof opt === "string") return opt;
+        if (typeof opt === "number") return String(opt);
+        if (typeof opt === "object" && opt !== null) {
+          return (
+            (opt as any).text ||
+            (opt as any).option ||
+            (opt as any).value ||
+            (opt as any).label ||
+            ""
+          );
+        }
+        return String(opt ?? "");
+      })
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+  }
+
+  // 3. Object dictionary e.g. { A: "...", B: "..." }
+  if (typeof raw === "object" && raw !== null) {
+    return Object.values(raw)
+      .map((opt) => {
+        if (typeof opt === "string") return opt;
+        if (typeof opt === "object" && opt !== null) {
+          return (
+            (opt as any).text ||
+            (opt as any).option ||
+            (opt as any).value ||
+            ""
+          );
+        }
+        return String(opt ?? "");
+      })
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+  }
+
+  // 4. Separate column fallbacks (option_a, option_b, etc.)
+  const sep = [
+    q.option_a,
+    q.option_b,
+    q.option_c,
+    q.option_d,
+    q.option_e,
+    q.option_f,
+    q.optionA,
+    q.optionB,
+    q.optionC,
+    q.optionD,
+    q.optionE,
+  ]
+    .filter((v) => typeof v === "string" && v.trim())
+    .map((v) => v.trim());
+
+  if (sep.length > 0) return sep;
+
+  return [];
+}
+
+/**
+ * Consolidates questions from both the relational 'questions' table
+ * and the 'exams.questions' / 'exams.theory_questions' JSONB columns.
+ */
+function consolidateExamQuestions(
+  examData: any,
+  tableQuestions: any[]
+): {
+  objectiveQuestions: Question[];
+  theoryQuestions: Question[];
+} {
+  const parseJsonSafe = (raw: any): any[] => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const jsonObjectives = parseJsonSafe(examData.questions);
+  const jsonTheory = parseJsonSafe(examData.theory_questions);
+
+  const objMap = new Map<string, any>();
+  const theoryMap = new Map<string, any>();
+
+  // Process rows from relational 'questions' table
+  for (const q of tableQuestions) {
+    const opts = extractOptions(q);
+    const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
+    const isTheory =
+      q.type === "theory" ||
+      q.is_theory === true ||
+      (opts.length === 0 && subQs.length > 0);
+
+    const key = String(q.id || q.question_text || q.question);
+
+    if (isTheory) {
+      theoryMap.set(key, {
+        ...q,
+        id: String(q.id ?? `th-${theoryMap.size}`),
+        question: q.question_text || q.question || "",
+        question_text: q.question_text || q.question || "",
+        type: "theory",
+        is_theory: true,
+        sub_questions: subQs,
+        marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
+        points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
+      });
+    } else {
+      objMap.set(key, {
+        ...q,
+        id: String(q.id ?? `obj-${objMap.size}`),
+        question: q.question_text || q.question || "",
+        question_text: q.question_text || q.question || "",
+        options: opts,
+        type: "objective",
+        is_theory: false,
+        marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
+        points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
+      });
+    }
+  }
+
+  // Merge JSON objectives
+  for (const q of jsonObjectives) {
+    const key = String(q.id || q.question || q.question_text);
+    const opts = extractOptions(q);
+    if (!objMap.has(key)) {
+      objMap.set(key, {
+        ...q,
+        id: String(q.id ?? `obj-${objMap.size}`),
+        question: q.question || q.question_text || "",
+        question_text: q.question_text || q.question || "",
+        options: opts,
+        type: "objective",
+        is_theory: false,
+        marks: Math.max(1, Math.round(Number(q.marks || q.points || 1))),
+        points: Math.max(1, Math.round(Number(q.points || q.marks || 1))),
+      });
+    }
+  }
+
+  // Merge JSON theory
+  for (const q of jsonTheory) {
+    const key = String(q.id || q.question || q.question_text);
+    const subQs = Array.isArray(q.sub_questions) ? q.sub_questions : [];
+    if (!theoryMap.has(key)) {
+      theoryMap.set(key, {
+        ...q,
+        id: String(q.id ?? `th-${theoryMap.size}`),
+        question: q.question || q.question_text || "",
+        question_text: q.question_text || q.question || "",
+        type: "theory",
+        is_theory: true,
+        sub_questions: subQs,
+        marks: Math.max(1, Math.round(Number(q.marks || q.points || 10))),
+        points: Math.max(1, Math.round(Number(q.points || q.marks || 10))),
+      });
+    }
+  }
+
+  return {
+    objectiveQuestions: Array.from(objMap.values()),
+    theoryQuestions: Array.from(theoryMap.values()),
+  };
+}
+
+/**
+ * Prepares questions:
+ * - Section A (Objectives) always comes first.
+ * - Section B (Theory) always comes after Objectives.
+ * - Only Objectives are shuffled (Languages like English/French/Yoruba are locked).
  */
 function processExamQuestions(
-  rawQuestions: Question[],
+  rawObjectives: Question[],
+  rawTheory: Question[],
   subjectInput?: any,
   examSettings: { shuffle_questions?: boolean; shuffle_options?: boolean } = {},
   examTitleInput?: any,
   fullExamData?: any
 ): Question[] {
-  // Normalize subject string
   const subjectStr =
     typeof subjectInput === "string"
       ? subjectInput
       : subjectInput?.name || subjectInput?.title || subjectInput?.subject || "";
 
-  // Normalize title string
   const titleStr =
     typeof examTitleInput === "string"
       ? examTitleInput
       : examTitleInput?.title || examTitleInput?.name || "";
 
-  // Combine title with any descriptive metadata to catch diacritics / keywords
   const extraStr =
     typeof fullExamData === "string"
       ? fullExamData
@@ -97,32 +287,28 @@ function processExamQuestions(
 
   const combinedTitleContext = [titleStr, extraStr].filter(Boolean).join(" ");
 
-  // Check if subject or title/context is protected (Yoruba, French, English, etc.)
-  // Passes exactly 2 arguments conforming to (subject?: string, examTitle?: string)
   const isExcludedSubject = isSubjectExcludedFromShuffle(
     subjectStr,
     combinedTitleContext
   );
 
-  // Tier 1: Question Shuffling Rule
   const allowQuestionShuffle = isExcludedSubject
     ? false
     : (examSettings.shuffle_questions ?? true);
 
-  // Tier 1: Base Option Shuffling Rule
   const allowOptionShuffleGlobally = isExcludedSubject
     ? false
     : (examSettings.shuffle_options ?? true);
 
-  // 1. Order Questions
-  let orderedQuestions = [...rawQuestions];
+  // 1. Process Objectives (Section A)
+  let orderedObjectives = [...rawObjectives];
   if (allowQuestionShuffle) {
-    orderedQuestions = shuffleArray(orderedQuestions);
+    orderedObjectives = shuffleArray(orderedObjectives);
   } else {
-    // Preserve strict original order created by teacher
-    orderedQuestions = orderedQuestions.sort((a: any, b: any) => {
+    orderedObjectives = orderedObjectives.sort((a: any, b: any) => {
       const numA = Number(
-        a.order_index ??
+        a.order_number ??
+          a.order_index ??
           a.q_index ??
           a.question_number ??
           a.question_index ??
@@ -130,7 +316,8 @@ function processExamQuestions(
           a.display_number
       );
       const numB = Number(
-        b.order_index ??
+        b.order_number ??
+          b.order_index ??
           b.q_index ??
           b.question_number ??
           b.question_index ??
@@ -141,52 +328,43 @@ function processExamQuestions(
       if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
         return numA - numB;
       }
-      if (a.created_at && b.created_at) {
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      }
       return 0;
     });
   }
 
-  // 2. Order Options for each Question
-  return orderedQuestions.map((q, index) => {
-    let options: string[] = [];
-
-    if (Array.isArray(q.options)) {
-      options = q.options.map((opt) => {
-        if (typeof opt === "string") return opt;
-        if (typeof opt === "object" && opt !== null && "text" in opt) {
-          const text = (opt as { text?: unknown }).text;
-          return typeof text === "string" ? text : String(text ?? "");
-        }
-        return String(opt ?? "");
-      });
-    } else if (typeof q.options === "string") {
-      try {
-        const parsed = JSON.parse(q.options);
-        if (Array.isArray(parsed)) {
-          options = parsed.map((opt) => {
-            if (typeof opt === "string") return opt;
-            if (typeof opt === "object" && opt !== null && "text" in opt) {
-              const text = (opt as { text?: unknown }).text;
-              return typeof text === "string" ? text : String(text ?? "");
-            }
-            return String(opt ?? "");
-          });
-        } else {
-          options = [];
-        }
-      } catch {
-        options = [];
-      }
+  // 2. Process Theory (Section B)
+  const orderedTheory = [...rawTheory].sort((a: any, b: any) => {
+    const numA = Number(
+      a.order_number ??
+        a.order_index ??
+        a.question_number ??
+        a.question_index ??
+        a.display_number
+    );
+    const numB = Number(
+      b.order_number ??
+        b.order_index ??
+        b.question_number ??
+        b.question_index ??
+        b.display_number
+    );
+    if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
+      return numA - numB;
     }
+    return 0;
+  });
 
-    // Tier 2: Check for relative phrases ("All of the above", "None of the above", etc.)
+  // 3. Assemble: Objectives first (Q1..Q40), then Theory (Q41..Q45)
+  const allTogether = [...orderedObjectives, ...orderedTheory];
+
+  return allTogether.map((q, index) => {
+    const options = extractOptions(q);
     const containsRelativePhrases = hasRelativeOptions(options);
 
-    // Options shuffle only if globally permitted AND no relative phrases exist
     const shouldShuffleOptions =
-      allowOptionShuffleGlobally && !containsRelativePhrases;
+      allowOptionShuffleGlobally &&
+      !containsRelativePhrases &&
+      q.type !== "theory";
 
     const finalizedOptions = shouldShuffleOptions
       ? shuffleArray([...options])
@@ -241,7 +419,7 @@ export function useExamLoader(
       const userProfile = await fetchProfile(session.userId);
       if (userProfile) setProfile(userProfile);
 
-      // 3. Exam Fetch
+      // 3. Exam Row Fetch
       let examData: Exam;
       try {
         examData = await fetchExam(examId);
@@ -251,20 +429,37 @@ export function useExamLoader(
       }
       setExam(examData);
 
-      // 4. Normalize & Apply Subject/Option Shuffle Rules
-      const {
-        questions: normalizedQuestions,
-        objectiveCount,
-        theoryCount,
-      } = normalizeExamQuestions(examData);
+      // 4. Relational Questions Table Fetch (Guarantees objectives are loaded)
+      const supabase = createClient();
+      let tableQuestions: any[] = [];
+      try {
+        const { data: qRows, error: qErr } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("exam_id", examId)
+          .order("order_number", { ascending: true });
+
+        if (!qErr && Array.isArray(qRows)) {
+          tableQuestions = qRows;
+        }
+      } catch (err) {
+        console.warn("[useExamLoader] Failed to read relational questions:", err);
+      }
+
+      // 5. Consolidate & Merge Objectives + Theory
+      const { objectiveQuestions, theoryQuestions } = consolidateExamQuestions(
+        examData,
+        tableQuestions
+      );
 
       const subjectName =
         examData.subject || (examData as any).subject_name || "";
       const examTitle = examData.title || "";
 
-      // Enforces locked shuffle for Yoruba, French, English, etc.
+      // 6. Section A & Section B arrangement with option extraction
       const processedQuestions = processExamQuestions(
-        normalizedQuestions,
+        objectiveQuestions,
+        theoryQuestions,
         subjectName,
         {
           shuffle_questions: examData.shuffle_questions,
@@ -276,7 +471,11 @@ export function useExamLoader(
         examTitle,
         examData
       );
+
       setAllQuestions(processedQuestions);
+
+      const objectiveCount = objectiveQuestions.length;
+      const theoryCount = theoryQuestions.length;
 
       const objectiveMax = objectiveCount || examData.objective_max || 20;
       const theoryMax =
@@ -285,10 +484,10 @@ export function useExamLoader(
           : 0;
       const actualTotalMarks = objectiveMax + theoryMax;
 
-      // 5. Dynamic Duration Resolution
+      // 7. Dynamic Duration Resolution
       const dynamicDuration = resolveExamDuration(examData);
 
-      // 6. Attempts Resolution
+      // 8. Attempts Resolution
       const allAttempts = await fetchAttempts(
         examId,
         userProfile?.id ?? session.userId
@@ -297,7 +496,7 @@ export function useExamLoader(
       const active = getActiveAttempt(allAttempts);
       const completedCount = completed.length;
 
-      // PRIORITY 1: In-progress resume check
+      // In-progress attempt resume check
       if (active) {
         const latest = active;
         setAttemptsUsed(completedCount);
