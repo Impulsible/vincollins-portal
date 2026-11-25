@@ -1,8 +1,7 @@
-// src/components/staff/exams/edit/EditExamPage.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,6 +55,7 @@ import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from "./types";
 const CURRENT_TERM = "third";
 const CURRENT_SESSION = "2025/2026";
 const EXAM_TOTAL_MARKS = 60;
+
 const TERM_NAMES: Record<string, string> = {
   first: "First Term",
   second: "Second Term",
@@ -132,7 +132,7 @@ function isObjectiveRow(q: any): boolean {
 }
 
 function isTheoryRow(q: any): boolean {
-  return q?.type === "theory" || q?.question_type === "theory";
+  return q?.type === "theory" || q?.question_type === "theory" || q?.question_type === "essay";
 }
 
 /* ─── PURE COMPONENTS ─── */
@@ -176,11 +176,18 @@ function QuestionCard({
 }: QuestionCardProps) {
   const objQ = type === "objective" ? (question as Question) : null;
   const theoryQ = type === "theory" ? (question as TheoryQuestion) : null;
-
-  const currentPoints =
-    question.points !== undefined && question.points !== null
-      ? question.points
-      : (question as any).marks ?? (type === "theory" ? 10 : 0.5);
+  
+  // Strict unsigned integer marks
+  const currentPoints = Math.max(
+    1,
+    Math.round(
+      Number(
+        question.points !== undefined && question.points !== null
+          ? question.points
+          : (question as any).marks ?? (type === "theory" ? 8 : 1)
+      ) || (type === "theory" ? 8 : 1)
+    )
+  );
 
   const isComplete =
     type === "objective"
@@ -265,7 +272,7 @@ function QuestionCard({
               )}
             </div>
 
-            {/* Marks / Points Input Control */}
+            {/* Integer Marks Control */}
             <div className="flex items-center gap-1.5">
               <label className="text-[10px] font-semibold text-slate-500 uppercase">
                 Marks:
@@ -274,12 +281,12 @@ function QuestionCard({
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
-                    min="0.5"
-                    step="0.5"
+                    min="1"
+                    step="1"
                     max="60"
                     value={currentPoints}
                     onChange={(e) =>
-                      onPointsChange(parseFloat(e.target.value) || 0)
+                      onPointsChange(Math.max(1, parseInt(e.target.value, 10) || 1))
                     }
                     className="w-14 h-6 text-center text-xs font-bold rounded border border-purple-200 bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:border-purple-800 dark:text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
@@ -349,20 +356,26 @@ function QuestionCard({
                   {theoryQ.sub_questions.length !== 1 ? "s" : ""}:
                 </p>
                 <div className="space-y-1 pl-2 border-l-2 border-slate-200 dark:border-slate-700">
-                  {theoryQ.sub_questions.map((sub, sIdx) => (
-                    <div
-                      key={sub.id || sIdx}
-                      className="text-xs text-slate-600 dark:text-slate-300"
-                    >
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">
-                        {sub.label || `(${String.fromCharCode(97 + sIdx)})`}
-                      </span>{" "}
-                      {sub.question_text}{" "}
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                        ({sub.points} pts)
-                      </span>
-                    </div>
-                  ))}
+                  {theoryQ.sub_questions.map((sub, sIdx) => {
+                    const subPts = Math.max(
+                      1,
+                      Math.round(Number(sub.points ?? (sub as any).marks) || 1)
+                    );
+                    return (
+                      <div
+                        key={sub.id || sIdx}
+                        className="text-xs text-slate-600 dark:text-slate-300"
+                      >
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {sub.label || (sub as any).question_number || `(${String.fromCharCode(97 + sIdx)})`}
+                        </span>{" "}
+                        {sub.question_text}{" "}
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                          ({subPts} pts)
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -413,8 +426,10 @@ function QuestionCard({
 }
 
 /* ─── MAIN COMPONENT ─── */
-export function EditExamPage({ examId }: { examId: string }) {
+export function EditExamPage({ examId: propExamId }: { examId?: string }) {
   const router = useRouter();
+  const params = useParams();
+  const examId = propExamId || (params?.id as string);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -427,11 +442,11 @@ export function EditExamPage({ examId }: { examId: string }) {
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
   const [questionsToAnswer, setQuestionsToAnswer] = useState<number>(4);
-
   const [passageText, setPassageText] = useState("");
   const [hasPassage, setHasPassage] = useState(false);
-
-  const [defaultMark, setDefaultMark] = useState(0.5);
+  
+  // Unsigned integer default mark for objective
+  const [defaultMark, setDefaultMark] = useState<number>(1);
 
   const [examDetails, setExamDetails] = useState<ExamDetailsForm>({
     title: "",
@@ -439,7 +454,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     class: "",
     duration: 60,
     instructions: "",
-    pass_mark: 50,
+    pass_mark: 30,
     shuffle_questions: true,
     shuffle_options: true,
     term: CURRENT_TERM,
@@ -458,7 +473,6 @@ export function EditExamPage({ examId }: { examId: string }) {
     type: "objective" | "theory";
   } | null>(null);
 
-  const initialLoadDoneRef = useRef(false);
   const hasMarksColRef = useRef(true);
 
   const availableSubjects = useMemo(() => {
@@ -469,27 +483,30 @@ export function EditExamPage({ examId }: { examId: string }) {
   const objectiveCount = questions.length;
   const theoryCount = theoryQuestions.length;
   const totalQuestions = objectiveCount + theoryCount;
-  const totalObjectivePoints = objectiveCount * defaultMark;
+  
+  // Integer Objective Points
+  const totalObjectivePoints = Math.round(objectiveCount * defaultMark);
 
-  // Answer N of M Theory Rules
+  // Unsigned Integer Candidate Theory Selection Count (N of M)
   const effectiveN = useMemo(() => {
     if (!hasTheory || theoryCount === 0) return 0;
-    if (!questionsToAnswer || questionsToAnswer <= 0) return theoryCount;
-    return Math.min(questionsToAnswer, theoryCount);
+    const qAns = Math.max(1, Math.round(Number(questionsToAnswer) || 1));
+    return Math.min(qAns, theoryCount);
   }, [hasTheory, questionsToAnswer, theoryCount]);
 
-  // Calculate theory total based on candidate answering effectiveN questions (highest N questions if varied)
+  // Top-N Integer Theory Marks Sum
   const totalTheoryPoints = useMemo(() => {
     if (!hasTheory || theoryCount === 0 || effectiveN === 0) return 0;
     const sorted = [...theoryQuestions].sort(
       (a, b) =>
-        (Number(b.points ?? (b as any).marks) || 0) -
-        (Number(a.points ?? (a as any).marks) || 0),
+        Math.round(Number(b.points ?? (b as any).marks) || 0) -
+        Math.round(Number(a.points ?? (a as any).marks) || 0),
     );
     return sorted
       .slice(0, effectiveN)
       .reduce(
-        (sum, q) => sum + (Number(q.points ?? (q as any).marks) || 0),
+        (sum, q) =>
+          sum + Math.max(1, Math.round(Number(q.points ?? (q as any).marks) || 0)),
         0,
       );
   }, [hasTheory, theoryCount, effectiveN, theoryQuestions]);
@@ -499,13 +516,14 @@ export function EditExamPage({ examId }: { examId: string }) {
   const passMarkPercentage =
     totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0;
   const isBalanced = totalExamPoints === EXAM_TOTAL_MARKS;
+
   const draftCount = [...questions, ...theoryQuestions].filter(
     (q) => q.is_draft,
   ).length;
 
   const buildQuestionsJSON = useCallback(() => {
     return questions.map((q, idx) => {
-      const pts = Number(q.points) || defaultMark;
+      const pts = Math.max(1, Math.round(Number(q.points) || defaultMark));
       return {
         id: q.id,
         question: q.question_text,
@@ -519,13 +537,17 @@ export function EditExamPage({ examId }: { examId: string }) {
         image_url: q.image_url || null,
         image_caption: q.image_caption || null,
         order: idx + 1,
+        order_number: idx + 1,
       };
     });
   }, [questions, defaultMark]);
 
   const buildTheoryQuestionsJSON = useCallback(() => {
     return theoryQuestions.map((q, idx) => {
-      const pts = Number(q.points ?? (q as any).marks) || 10;
+      const pts = Math.max(
+        1,
+        Math.round(Number(q.points ?? (q as any).marks) || 8)
+      );
       return {
         id: q.id,
         question: q.question_text,
@@ -533,12 +555,17 @@ export function EditExamPage({ examId }: { examId: string }) {
         marks: pts,
         points: pts,
         type: "theory",
-        sub_questions: q.sub_questions || [],
+        sub_questions: (q.sub_questions || []).map((sub: any) => ({
+          ...sub,
+          points: Math.max(1, Math.round(Number(sub.points ?? sub.marks) || 1)),
+          marks: Math.max(1, Math.round(Number(sub.points ?? sub.marks) || 1)),
+        })),
         keywords: q.keywords || [],
         model_answer: q.model_answer || "",
         image_url: q.image_url || null,
         image_caption: q.image_caption || null,
         order: idx + 1,
+        order_number: idx + 1,
       };
     });
   }, [theoryQuestions]);
@@ -547,7 +574,6 @@ export function EditExamPage({ examId }: { examId: string }) {
     async (silent = false) => {
       try {
         if (!silent) setRefreshing(true);
-
         const { data, error } = await supabase
           .from("questions")
           .select("*")
@@ -556,8 +582,8 @@ export function EditExamPage({ examId }: { examId: string }) {
           .order("order_number", { ascending: true });
 
         if (error) throw error;
-
         const rows = data || [];
+
         if (rows.length > 0) {
           hasMarksColRef.current = "marks" in rows[0];
         }
@@ -569,12 +595,11 @@ export function EditExamPage({ examId }: { examId: string }) {
               : q.marks !== undefined && q.marks !== null
                 ? q.marks
                 : defaultMark;
-          const pts =
-            typeof rawPts === "string" ? parseFloat(rawPts) : Number(rawPts) || defaultMark;
+          const pts = Math.max(1, Math.round(Number(rawPts) || defaultMark));
 
           return {
             ...q,
-            question_text: q.question_text || "",
+            question_text: q.question_text || q.question || "",
             options: q.options || [],
             points: pts,
             marks: pts,
@@ -592,16 +617,19 @@ export function EditExamPage({ examId }: { examId: string }) {
               ? q.points
               : q.marks !== undefined && q.marks !== null
                 ? q.marks
-                : 10;
-          const pts =
-            typeof rawPts === "string" ? parseFloat(rawPts) : Number(rawPts) || 10;
+                : 8;
+          const pts = Math.max(1, Math.round(Number(rawPts) || 8));
 
           return {
             ...q,
-            question_text: q.question_text || "",
+            question_text: q.question_text || q.question || "",
             points: pts,
             marks: pts,
-            sub_questions: q.sub_questions || [],
+            sub_questions: (q.sub_questions || []).map((sub: any) => ({
+              ...sub,
+              points: Math.max(1, Math.round(Number(sub.points ?? sub.marks) || 1)),
+              marks: Math.max(1, Math.round(Number(sub.points ?? sub.marks) || 1)),
+            })),
             keywords: q.keywords || [],
             type: "theory" as const,
             question_type: "theory" as const,
@@ -630,6 +658,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         .select("*")
         .eq("id", examId)
         .single();
+
       if (error) {
         setLoadError(`Failed to load exam: ${error.message}`);
         throw error;
@@ -645,31 +674,43 @@ export function EditExamPage({ examId }: { examId: string }) {
           examData.shuffle_questions ?? examData.randomize_questions ?? true,
         shuffle_options:
           examData.shuffle_options ?? examData.randomize_options ?? true,
-        pass_mark: examData.pass_mark ?? 50,
+        pass_mark: Math.round(Number(examData.pass_mark ?? examData.passing_marks) || 30),
       };
+
       setExam(merged as Exam);
-      setHasTheory(examData.has_theory || false);
-      setDefaultMark(examData.default_mark || 0.5);
-      setQuestionsToAnswer(examData.questions_to_answer || 4);
+      setHasTheory(Boolean(examData.has_theory));
+      setDefaultMark(Math.max(1, Math.round(Number(examData.default_mark) || 1)));
+
+      // Load using the correct schema column names
+      const savedTheoryCount =
+        examData.theory_questions_to_answer ??
+        examData.required_theory_count;
+
+      if (savedTheoryCount && Number(savedTheoryCount) > 0) {
+        setQuestionsToAnswer(Math.round(Number(savedTheoryCount)));
+      } else {
+        const match = (examData.instructions || "").match(/Answer (?:any )?(\d+)/i);
+        setQuestionsToAnswer(match && match[1] ? parseInt(match[1], 10) : 4);
+      }
 
       setExamDetails({
         title: examData.title || "",
         subject: examData.subject || "",
         class: examData.class || "",
-        duration: examData.duration || 60,
+        duration: Math.round(Number(examData.duration ?? examData.duration_minutes) || 60),
         instructions: examData.instructions || examData.description || "",
-        pass_mark: examData.pass_mark || 50,
+        pass_mark: merged.pass_mark,
         shuffle_questions: merged.shuffle_questions,
         shuffle_options: merged.shuffle_options,
         term: examData.term || CURRENT_TERM,
         session_year: examData.session_year || CURRENT_SESSION,
         target_audience: examData.target_audience || "all",
       });
+
       setPassageText(examData.passage_text || "");
-      setHasPassage(!!examData.passage_text);
+      setHasPassage(Boolean(examData.passage_text));
 
       await loadQuestions(true);
-      initialLoadDoneRef.current = true;
     } catch {
       toast.error("Failed to load exam data");
     } finally {
@@ -681,7 +722,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     if (examId) loadExamData();
   }, [examId, loadExamData]);
 
-  // Handle Clean Auto-Balance without decimals
+  // Clean Auto-Balance: Allocates exact unsigned integer marks (e.g. 8 marks each)
   const handleAutoBalance = async () => {
     if (theoryCount === 0) {
       toast.error("Please add theory questions first");
@@ -689,13 +730,26 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const n = effectiveN > 0 ? effectiveN : theoryCount;
     const requiredTarget = Math.max(0, EXAM_TOTAL_MARKS - totalObjectivePoints);
-    const marksPerQ = Math.round((requiredTarget / n) * 10) / 10;
+    const marksPerQ = Math.max(1, Math.round(requiredTarget / n));
 
-    const updated = theoryQuestions.map((q) => ({
-      ...q,
-      points: marksPerQ,
-      marks: marksPerQ,
-    }));
+    const updated = theoryQuestions.map((q) => {
+      let subQs = q.sub_questions;
+      if (subQs && subQs.length > 0) {
+        const subMarks = Math.max(1, Math.round(marksPerQ / subQs.length));
+        subQs = subQs.map((sub) => ({
+          ...sub,
+          points: subMarks,
+          marks: subMarks,
+        }));
+      }
+      return {
+        ...q,
+        points: marksPerQ,
+        marks: marksPerQ,
+        sub_questions: subQs,
+      };
+    });
+
     setTheoryQuestions(updated);
 
     try {
@@ -703,6 +757,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         updated.map(async (q) => {
           const payload: Record<string, any> = {
             points: marksPerQ,
+            sub_questions: q.sub_questions,
             updated_at: new Date().toISOString(),
           };
           if (hasMarksColRef.current) payload.marks = marksPerQ;
@@ -718,35 +773,38 @@ export function EditExamPage({ examId }: { examId: string }) {
               .from("questions")
               .update({
                 points: marksPerQ,
+                sub_questions: q.sub_questions,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", q.id);
           }
         }),
       );
+
       toast.success(
-        `Balanced: ${marksPerQ} marks per question (${n} required × ${marksPerQ} = ${requiredTarget} marks)`,
+        `Balanced: ${marksPerQ} marks per question (${n} required × ${marksPerQ} = ${n * marksPerQ} marks)`,
       );
     } catch {
       toast.error("Failed to update question marks in database");
     }
   };
 
+  // Inline mark changer: guarantees unsigned integer persistence
   const handleUpdateTheoryMarks = async (id: string, newPoints: number) => {
-    // 1. Immediately update local state for responsive UI
+    const intPoints = Math.max(1, Math.round(newPoints));
+
     setTheoryQuestions((prev) =>
       prev.map((q) =>
-        q.id === id ? { ...q, points: newPoints, marks: newPoints } : q,
+        q.id === id ? { ...q, points: intPoints, marks: intPoints } : q,
       ),
     );
 
-    // 2. Persist to database questions table safely
     try {
       const payload: Record<string, any> = {
-        points: newPoints,
+        points: intPoints,
         updated_at: new Date().toISOString(),
       };
-      if (hasMarksColRef.current) payload.marks = newPoints;
+      if (hasMarksColRef.current) payload.marks = intPoints;
 
       const { error } = await supabase
         .from("questions")
@@ -758,64 +816,17 @@ export function EditExamPage({ examId }: { examId: string }) {
         await supabase
           .from("questions")
           .update({
-            points: newPoints,
+            points: intPoints,
             updated_at: new Date().toISOString(),
           })
           .eq("id", id);
       }
     } catch (e) {
-      console.error("Inline mark update failed:", e);
+      console.error("Inline mark update note:", e);
     }
   };
 
-  const updateExamTotals = useCallback(async () => {
-    if (!examId || loading || !initialLoadDoneRef.current) return;
-    if (totalQuestions === 0 && (exam?.total_questions ?? 0) > 0) return;
-
-    const questionsJSON = buildQuestionsJSON();
-    const theoryQuestionsJSON = buildTheoryQuestionsJSON();
-
-    await supabase
-      .from("exams")
-      .update({
-        total_questions: totalQuestions,
-        total_marks: totalExamPoints,
-        total_points: totalExamPoints,
-        objective_max: totalObjectivePoints,
-        theory_max: totalTheoryPoints,
-        theory_total_marks: totalTheoryPoints,
-        objective_total_marks: totalObjectivePoints,
-        questions_to_answer: questionsToAnswer,
-        exam_total_marks: EXAM_TOTAL_MARKS,
-        ca1_max: 10,
-        ca2_max: 10,
-        ca_total_marks: 20,
-        grand_total_marks: 100,
-        default_mark: defaultMark,
-        questions: questionsJSON,
-        theory_questions: theoryQuestionsJSON,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", examId);
-  }, [
-    examId,
-    totalQuestions,
-    totalExamPoints,
-    totalObjectivePoints,
-    totalTheoryPoints,
-    questionsToAnswer,
-    defaultMark,
-    loading,
-    buildQuestionsJSON,
-    buildTheoryQuestionsJSON,
-    exam?.total_questions,
-  ]);
-
-  useEffect(() => {
-    if (!loading && initialLoadDoneRef.current) updateExamTotals();
-  }, [totalQuestions, totalExamPoints, questionsToAnswer, updateExamTotals, loading]);
-
-  // Master Save Button: Persists Exam record + All question points across the database
+  // Master Save Handler: Persists using exact `exams` and `questions` table schema
   const handleSaveExam = async () => {
     if (!examDetails.title.trim()) {
       toast.error("Please enter an exam title");
@@ -834,7 +845,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     if (totalExamPoints !== EXAM_TOTAL_MARKS) {
       toast.error(
-        `Exam total must be ${EXAM_TOTAL_MARKS} marks. Current total: ${totalExamPoints}`,
+        `Exam total must equal ${EXAM_TOTAL_MARKS} marks. Current total is ${totalExamPoints}`,
       );
       return;
     }
@@ -843,13 +854,33 @@ export function EditExamPage({ examId }: { examId: string }) {
     try {
       const questionsJSON = buildQuestionsJSON();
       const theoryQuestionsJSON = buildTheoryQuestionsJSON();
+      const qAnswer = effectiveN > 0 ? effectiveN : questionsToAnswer;
+      const singleTheoryMark =
+        theoryQuestions.length > 0
+          ? Math.max(1, Math.round(Number(theoryQuestions[0]?.points ?? (theoryQuestions[0] as any)?.marks) || 8))
+          : 8;
 
-      // 1. Sync every theory and objective question to the `questions` table
+      const formattedInstructions =
+        examDetails.instructions.trim() ||
+        (hasTheory
+          ? `Section A: Objective (${objectiveCount} questions, ${totalObjectivePoints} marks).\nSection B: Theory - Answer any ${qAnswer} of ${theoryCount} questions (${singleTheoryMark} marks each, ${totalTheoryPoints} marks total).`
+          : `Answer all ${objectiveCount} objective questions.`);
+
+      // 1. Sync every theory and objective question to `questions` table
       await Promise.all([
-        ...theoryQuestions.map(async (tq) => {
-          const pts = Number(tq.points ?? (tq as any).marks) || 10;
+        ...theoryQuestions.map(async (tq, idx) => {
+          const pts = Math.max(
+            1,
+            Math.round(Number(tq.points ?? (tq as any).marks) || 8)
+          );
           const payload: Record<string, any> = {
+            question_text: tq.question_text || "",
             points: pts,
+            sub_questions: tq.sub_questions || [],
+            keywords: tq.keywords || [],
+            model_answer: tq.model_answer || "",
+            order_number: idx + 1,
+            is_draft: tq.is_draft ?? false,
             updated_at: new Date().toISOString(),
           };
           if (hasMarksColRef.current) payload.marks = pts;
@@ -863,14 +894,23 @@ export function EditExamPage({ examId }: { examId: string }) {
             hasMarksColRef.current = false;
             await supabase
               .from("questions")
-              .update({ points: pts, updated_at: new Date().toISOString() })
+              .update({
+                points: pts,
+                sub_questions: tq.sub_questions || [],
+                updated_at: new Date().toISOString(),
+              })
               .eq("id", tq.id);
           }
         }),
-        ...questions.map(async (oq) => {
-          const pts = Number(oq.points) || defaultMark;
+        ...questions.map(async (oq, idx) => {
+          const pts = Math.max(1, Math.round(Number(oq.points) || defaultMark));
           const payload: Record<string, any> = {
+            question_text: oq.question_text || "",
             points: pts,
+            options: oq.options || [],
+            correct_answer: oq.correct_answer || "",
+            order_number: idx + 1,
+            is_draft: oq.is_draft ?? false,
             updated_at: new Date().toISOString(),
           };
           if (hasMarksColRef.current) payload.marks = pts;
@@ -890,53 +930,61 @@ export function EditExamPage({ examId }: { examId: string }) {
         }),
       ]);
 
-      // 2. Save complete exam configuration to `exams` table
-      const payload = {
+      // 2. Save complete exam configuration using the exact verified columns
+      const examPayload = {
         title: examDetails.title.trim(),
         subject: examDetails.subject,
         class: examDetails.class,
-        duration: examDetails.duration,
-        pass_mark: examDetails.pass_mark,
-        description: examDetails.instructions,
-        instructions: examDetails.instructions,
-        randomize_questions: examDetails.shuffle_questions,
-        randomize_options: examDetails.shuffle_options,
-        shuffle_questions: examDetails.shuffle_questions,
-        shuffle_options: examDetails.shuffle_options,
-        has_theory: hasTheory,
-        questions_to_answer: effectiveN > 0 ? effectiveN : questionsToAnswer,
+        duration: Math.max(1, Math.round(Number(examDetails.duration) || 60)),
+        duration_minutes: Math.max(1, Math.round(Number(examDetails.duration) || 60)),
+        pass_mark: Math.max(1, Math.round(Number(examDetails.pass_mark) || 30)),
+        description: formattedInstructions,
+        instructions: formattedInstructions,
+        randomize_questions: Boolean(examDetails.shuffle_questions),
+        randomize_options: Boolean(examDetails.shuffle_options),
+        shuffle_questions: Boolean(examDetails.shuffle_questions),
+        shuffle_options: Boolean(examDetails.shuffle_options),
+        has_theory: Boolean(hasTheory),
+        required_theory_count: qAnswer,
+        theory_questions_to_answer: qAnswer,
+        theory_questions_total: theoryCount,
+        theory_marks_per_question: singleTheoryMark,
+        theory_total: totalTheoryPoints,
+        theory_total_marks: totalTheoryPoints,
+        theory_max: totalTheoryPoints,
+        objective_count: objectiveCount,
+        objective_total_marks: totalObjectivePoints,
+        objective_max: totalObjectivePoints,
         term: examDetails.term,
         session_year: examDetails.session_year,
-        target_audience: examDetails.target_audience,
+        target_audience: examDetails.target_audience || "all",
         total_questions: totalQuestions,
-        total_marks: totalExamPoints,
-        total_points: totalExamPoints,
-        objective_max: totalObjectivePoints,
-        theory_max: totalTheoryPoints,
-        theory_total_marks: totalTheoryPoints,
-        objective_total_marks: totalObjectivePoints,
+        total_marks: EXAM_TOTAL_MARKS,
+        total_points: EXAM_TOTAL_MARKS,
         exam_total_marks: EXAM_TOTAL_MARKS,
+        exam_total: EXAM_TOTAL_MARKS,
         ca1_max: 10,
         ca2_max: 10,
         ca_total_marks: 20,
         grand_total_marks: 100,
-        default_mark: defaultMark,
+        default_mark: Math.max(1, Math.round(defaultMark)),
         passage_text: hasPassage ? passageText : null,
         questions: questionsJSON,
         theory_questions: theoryQuestionsJSON,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      const { error: examErr } = await supabase
         .from("exams")
-        .update(payload)
+        .update(examPayload)
         .eq("id", examId);
 
-      if (error) throw error;
+      if (examErr) throw examErr;
 
       toast.success("Exam and question marks saved successfully across system");
       router.push("/staff/exams");
     } catch (e: any) {
+      console.error("Save error:", e);
       toast.error(e.message || "Failed to update exam");
     } finally {
       setSaving(false);
@@ -950,7 +998,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const opts = (data.options || []).filter((o) => o.trim());
     const isDraft = data.is_draft ?? true;
-    const pts = data.points || defaultMark;
+    const pts = Math.max(1, Math.round(Number(data.points) || defaultMark));
 
     const payload: Record<string, any> = {
       exam_id: examId,
@@ -996,7 +1044,7 @@ export function EditExamPage({ examId }: { examId: string }) {
     }
     const opts = (data.options || []).filter((o) => o.trim());
     const isDraft = data.is_draft ?? false;
-    const pts = data.points || defaultMark;
+    const pts = Math.max(1, Math.round(Number(data.points) || defaultMark));
 
     const payload: Record<string, any> = {
       question_text: data.question_text.trim(),
@@ -1037,6 +1085,7 @@ export function EditExamPage({ examId }: { examId: string }) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", questionToDelete.id);
+
     if (error) {
       toast.error(`Failed to delete: ${error.message}`);
       return;
@@ -1053,11 +1102,15 @@ export function EditExamPage({ examId }: { examId: string }) {
       return;
     }
     const isDraft = data.is_draft ?? true;
-    const defaultPoints =
-      data.points ??
-      (effectiveN > 0
-        ? Math.round((targetTheoryMarks / effectiveN) * 10) / 10
-        : 10);
+    const defaultPoints = Math.max(
+      1,
+      Math.round(
+        Number(
+          data.points ??
+            (effectiveN > 0 ? targetTheoryMarks / effectiveN : 8)
+        )
+      )
+    );
 
     const payload: Record<string, any> = {
       exam_id: examId,
@@ -1107,7 +1160,10 @@ export function EditExamPage({ examId }: { examId: string }) {
       return;
     }
     const isDraft = data.is_draft ?? false;
-    const pts = data.points ?? (data as any).marks ?? 10;
+    const pts = Math.max(
+      1,
+      Math.round(Number(data.points ?? (data as any).marks) || 8)
+    );
 
     const payload: Record<string, any> = {
       question_text: data.question_text.trim(),
@@ -1209,7 +1265,7 @@ export function EditExamPage({ examId }: { examId: string }) {
               </span>
             </div>
             <div className="flex gap-1">
-              {[0.5, 1, 2].map((mark) => (
+              {[1, 2].map((mark) => (
                 <button
                   key={mark}
                   onClick={() => {
@@ -1250,7 +1306,6 @@ export function EditExamPage({ examId }: { examId: string }) {
                   </p>
                 </div>
               </div>
-
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-800 rounded-lg px-2 py-1">
                   <span className="text-[11px] text-slate-500 font-medium">
@@ -1263,7 +1318,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                     value={questionsToAnswer}
                     onChange={(e) =>
                       setQuestionsToAnswer(
-                        Math.max(1, parseInt(e.target.value) || 1),
+                        Math.max(1, parseInt(e.target.value, 10) || 1),
                       )
                     }
                     className="w-12 h-6 text-center text-xs font-bold border-0 bg-transparent p-0 focus-visible:ring-0 text-purple-700 dark:text-purple-300"
@@ -1272,7 +1327,6 @@ export function EditExamPage({ examId }: { examId: string }) {
                     of {theoryCount}
                   </span>
                 </div>
-
                 <Button
                   size="sm"
                   onClick={handleAutoBalance}
@@ -1324,7 +1378,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                   )}
                 >
                   {isBalanced
-                    ? `Current: ${EXAM_TOTAL_MARKS} / ${EXAM_TOTAL_MARKS}`
+                    ? `Balanced: ${EXAM_TOTAL_MARKS} / ${EXAM_TOTAL_MARKS}`
                     : `Current: ${totalExamPoints} / ${EXAM_TOTAL_MARKS}`}
                 </Badge>
                 <Button
@@ -1340,6 +1394,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                 </Button>
               </div>
             </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
               <StatTile
                 value={objectiveCount}
@@ -1362,6 +1417,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                 accent="bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300"
               />
             </div>
+
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between pt-3 border-t border-slate-100 dark:border-slate-800 gap-3">
               <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
                 <div>
@@ -1573,6 +1629,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                     )}
                   </div>
                 </div>
+
                 <CardContent className="p-2 sm:p-4">
                   <ScrollArea className="h-[460px] sm:h-[520px] pr-1 sm:pr-2">
                     <div className="space-y-2 sm:space-y-2.5 pr-1 sm:pr-2">
@@ -1612,8 +1669,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                           <div className="flex items-center gap-2 py-1">
                             <FlaskConical className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
                             <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                              Theory ({theoryCount}) — Candidates answer{" "}
-                              {effectiveN}
+                              Theory ({theoryCount}) — Candidates answer {effectiveN}
                             </span>
                             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                           </div>
@@ -1778,3 +1834,5 @@ export function EditExamPage({ examId }: { examId: string }) {
     </div>
   );
 }
+
+export default EditExamPage;
