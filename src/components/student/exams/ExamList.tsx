@@ -1,11 +1,10 @@
-// src/components/student/exams/ExamList.tsx
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 import { ExamCard } from "./ExamCard";
-import type { Exam, ExamAttempt, ViewMode } from "@/app/student/exams/types";
+import type { Exam, ExamAttempt, ExamStatus, ViewMode } from "@/app/student/exams/types";
 
 interface ExamListProps {
   exams: Exam[];
@@ -70,21 +69,64 @@ export function ExamList({
               : "flex flex-col gap-3 max-w-4xl mx-auto",
           )}
         >
-          {exams.map((exam, i) => (
-            <motion.div
-              key={exam.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <ExamCard
-                exam={exam}
-                config={getSubjectConfig(exam.subject)}
-                viewMode={viewMode}
-                onTakeExam={onTakeExam}
-                onViewResult={onViewResult} status={"available"}              />
-            </motion.div>
-          ))}
+          {exams.map((exam, i) => {
+            // Resilient lookup: handles dictionary by exam.id, attempt.id, or direct attachment
+            const attempt =
+              (exam as any).attempt ||
+              (exam as any).latest_attempt ||
+              (examAttempts && !Array.isArray(examAttempts) ? examAttempts[exam.id] : undefined) ||
+              (examAttempts && !Array.isArray(examAttempts) ? examAttempts[(exam as any).exam_id] : undefined) ||
+              (examAttempts && !Array.isArray(examAttempts)
+                ? Object.values(examAttempts).find((a: any) => a?.exam_id === exam.id || a?.id === exam.id || a?.exam_id === (exam as any).exam_id)
+                : undefined) ||
+              (Array.isArray(examAttempts)
+                ? (examAttempts as any[]).find((a: any) => a?.exam_id === exam.id || a?.id === exam.id)
+                : undefined);
+
+            const isCompleted = Boolean(
+              (exam as any).status === "completed" ||
+              (exam as any).status === "graded" ||
+              (exam as any).status === "pending_theory" ||
+              (attempt && (
+                attempt.status === "completed" ||
+                attempt.status === "graded" ||
+                attempt.status === "pending_theory" ||
+                attempt.status === "submitted" ||
+                Boolean((attempt as any).is_theory_pending) ||
+                (attempt.percentage !== undefined && attempt.percentage !== null) ||
+                (attempt.objective_score !== undefined &&
+                  attempt.objective_score !== null &&
+                  attempt.status !== "in_progress")
+              ))
+            );
+
+            const status: ExamStatus = isCompleted
+              ? "completed"
+              : attempt?.status === "in_progress"
+              ? "in_progress"
+              : (exam as any).status === "upcoming"
+              ? "upcoming"
+              : "available";
+
+            return (
+              <motion.div
+                key={exam.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+              >
+                <ExamCard
+                  exam={exam}
+                  attempt={attempt}
+                  status={status}
+                  config={getSubjectConfig(exam.subject)}
+                  viewMode={viewMode}
+                  onTakeExam={onTakeExam}
+                  onViewResult={onViewResult}
+                />
+              </motion.div>
+            );
+          })}
         </motion.div>
       </AnimatePresence>
     </div>

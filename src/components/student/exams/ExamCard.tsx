@@ -15,7 +15,7 @@ import type { Exam, ExamAttempt, ExamStatus, SubjectConfig, ViewMode } from '@/a
 interface ExamCardProps {
   exam: Exam
   attempt?: ExamAttempt
-  status: ExamStatus
+  status?: ExamStatus
   config: SubjectConfig
   viewMode: ViewMode
   onTakeExam: (examId: string) => void
@@ -40,45 +40,54 @@ const getWAECGrade = (pct: number): GradeInfo => {
 
 interface ScoreData { displayPct: number; displayScore: number; displayTotal: number; hasCA: boolean; isPending: boolean }
 
-const calcScore = (attempt?: ExamAttempt): ScoreData => {
+const calcScore = (attempt?: ExamAttempt, exam?: Exam): ScoreData => {
   if (!attempt) return { displayPct: 0, displayScore: 0, displayTotal: 100, hasCA: false, isPending: false }
   
-  const isPending = attempt.status === 'pending_theory' || Boolean((attempt as any).is_theory_pending)
+  const rawObj = Number(attempt.objective_score ?? (attempt as any).score ?? 0)
+  const isHalved = Boolean((attempt as any).is_score_halved)
+  const violations = Number((attempt as any).tab_switches || 0) + 
+                     Number((attempt as any).fullscreen_exits || 0) + 
+                     Number((attempt as any).warnings || 0)
+  const obj = (isHalved && violations === 0) ? rawObj * 2 : rawObj
+
+  const objMax = Number(attempt.objective_total || (exam as any)?.objective_marks || (exam as any)?.total_marks || 20)
+  const theoryMax = Number(attempt.theory_total || (exam as any)?.theory_marks || Math.max(0, 60 - objMax))
+  const hasTheory = Boolean((exam as any)?.has_theory || theoryMax > 0 || (attempt as any)?.has_theory)
+
+  const theoryScoreRaw = attempt.theory_score
+  const hasGradedTheory = theoryScoreRaw !== null && theoryScoreRaw !== undefined && !isNaN(Number(theoryScoreRaw))
+  const theory = hasGradedTheory ? Number(theoryScoreRaw) : 0
+
+  const isPending = 
+    attempt.status === 'pending_theory' || 
+    Boolean((attempt as any).is_theory_pending) ||
+    (hasTheory && !hasGradedTheory && !(attempt as any).teacher_feedback && !(attempt as any).theory_feedback)
+
   const ca1 = Number(attempt.ca1_score) || 0
   const ca2 = Number(attempt.ca2_score) || 0
   const caTotal = Number((attempt as any).ca_total_score) || (ca1 + ca2)
   const hasCA = !!(attempt.ca1_score !== undefined && attempt.ca1_score !== null) || 
                 !!(attempt as any).hasCA || !!(attempt as any).has_ca ||
                 (caTotal > 0)
-                
-  const obj = Number(attempt.objective_score) || 0
-  const theory = Number(attempt.theory_score) || 0
-  const objMax = Number(attempt.objective_total) || 20
-  const theoryMax = Number(attempt.theory_total) || Math.max(0, 60 - objMax)
-  
+
   let displayScore = 0
   let displayTotal = 100
 
-  if (isPending) {
+  if (isPending || !hasTheory) {
     displayScore = obj
-    displayTotal = objMax
-  } else if (hasCA && caTotal > 0) {
+    displayTotal = objMax > 0 ? objMax : 20
+  } else if (hasCA && hasGradedTheory && caTotal > 0) {
     displayScore = caTotal + obj + theory
     displayTotal = 100
-  } else if (theory > 0 || (attempt as any).status === 'graded' || (attempt as any).status === 'completed') {
+  } else if (hasGradedTheory) {
     displayScore = obj + theory
     displayTotal = objMax + theoryMax || 60
   } else {
     displayScore = obj
-    displayTotal = objMax
+    displayTotal = objMax > 0 ? objMax : 20
   }
 
-  const storedPct = attempt.percentage
-  const displayPct = isPending && objMax > 0
-    ? Math.min(Math.max(Math.round((obj / objMax) * 100), 0), 100)
-    : storedPct != null && storedPct > 0
-    ? Math.min(Math.max(Math.round(storedPct), 0), 100)
-    : Math.min(Math.max(Math.round((displayScore / (displayTotal || 1)) * 100), 0), 100)
+  const displayPct = Math.min(Math.max(Math.round((displayScore / (displayTotal || 1)) * 100), 0), 100)
 
   return { 
     displayPct, 
@@ -97,10 +106,9 @@ const STATUS_MAP = {
   available: { icon: Lock, label: 'Available', cls: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700' },
 } as const
 
-function StatusBadge({ status, attempt }: { status: ExamStatus; attempt?: ExamAttempt }) {
-  const isPending = attempt?.status === 'pending_theory' || Boolean((attempt as any)?.is_theory_pending)
+function StatusBadge({ status, attempt, isPending }: { status: ExamStatus; attempt?: ExamAttempt; isPending?: boolean }) {
   const key =
-    status === 'completed' && isPending ? 'completed_pending'
+    (status === 'completed' || isPending) && isPending ? 'completed_pending'
     : status === 'completed' ? 'completed'
     : status === 'upcoming' ? 'upcoming'
     : attempt?.status === 'in_progress' ? 'in_progress'
@@ -168,13 +176,14 @@ function ScoreRing({ pct, gradeInfo, size = 64 }: { pct: number; gradeInfo: Grad
   )
 }
 
-function ActionButton({ status, attempt, examId, onTakeExam, onViewResult, fullWidth = false }: {
+function ActionButton({ status, attempt, examId, onTakeExam, onViewResult, fullWidth = false, isCompleted }: {
   status: ExamStatus; attempt?: ExamAttempt; examId: string
-  onTakeExam: (id: string) => void; onViewResult: (id: string) => void; fullWidth?: boolean
+  onTakeExam: (id: string) => void; onViewResult: (id: string) => void; fullWidth?: boolean; isCompleted?: boolean
 }) {
   const base = cn('h-8 text-xs font-semibold gap-1.5 rounded-xl transition-all duration-150 cursor-pointer', fullWidth && 'w-full')
-  if (status === 'completed') return (
-    <Button size="sm" onClick={() => onViewResult(examId)} className={cn(base, 'bg-slate-900 dark:bg-slate-100 hover:bg-slate-700 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm')}>
+  
+  if (isCompleted || status === 'completed') return (
+    <Button size="sm" onClick={() => onViewResult(attempt?.id || examId)} className={cn(base, 'bg-slate-900 dark:bg-slate-100 hover:bg-slate-700 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm')}>
       <Eye className="h-3.5 w-3.5" /> View Result <ArrowRight className="h-3 w-3 ml-0.5 opacity-60" />
     </Button>
   )
@@ -202,13 +211,31 @@ const accentCls = (status: ExamStatus, isPending: boolean, inProgress: boolean) 
   return 'bg-slate-200 dark:bg-slate-700'
 }
 
-export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, onViewResult }: ExamCardProps) {
+export function ExamCard({ exam, attempt: propAttempt, status: propStatus, config, viewMode, onTakeExam, onViewResult }: ExamCardProps) {
+  const attempt = propAttempt || (exam as any).attempt || (exam as any).latest_attempt
   const SubjectIcon = config.icon
-  const { displayPct, displayScore, displayTotal, hasCA, isPending } = calcScore(attempt)
+  const { displayPct, displayScore, displayTotal, hasCA, isPending } = calcScore(attempt, exam)
   const gradeInfo = getWAECGrade(displayPct)
   const inProgress = attempt?.status === 'in_progress'
+
+  const isCompleted = Boolean(
+    propStatus === 'completed' ||
+    (exam as any).status === 'completed' ||
+    isPending ||
+    Boolean(
+      attempt && (
+        attempt.status === 'completed' ||
+        attempt.status === 'graded' ||
+        attempt.status === 'pending_theory' ||
+        attempt.status === 'submitted' ||
+        (attempt.percentage !== undefined && attempt.percentage !== null) ||
+        (attempt.objective_score !== undefined && attempt.objective_score !== null && attempt.status !== 'in_progress')
+      )
+    )
+  )
+
+  const status: ExamStatus = isCompleted ? 'completed' : (propStatus || (inProgress ? 'in_progress' : 'available'))
   const accent = accentCls(status, isPending, inProgress)
-  const isCompleted = status === 'completed' && !!attempt
 
   if (viewMode === 'list') {
     return (
@@ -230,7 +257,7 @@ export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, 
                           {exam.subject}{exam.class ? ` · ${exam.class}` : ''}{exam.term && exam.session_year ? ` · ${exam.term} ${exam.session_year}` : ''}
                         </p>
                       </div>
-                      <StatusBadge status={status} attempt={attempt} />
+                      <StatusBadge status={status} attempt={attempt} isPending={isPending} />
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {exam.duration > 0 && <MetaPill icon={Timer} label={`${exam.duration}m`} />}
@@ -246,7 +273,7 @@ export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, 
                     </div>
                   )}
                   <div className="hidden sm:flex shrink-0 ml-1">
-                    <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} />
+                    <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} isCompleted={isCompleted} />
                   </div>
                 </div>
                 <div className="sm:hidden mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
@@ -259,7 +286,7 @@ export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, 
                       </div>
                     </div>
                   )}
-                  <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth={!isCompleted} />
+                  <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth={!isCompleted} isCompleted={isCompleted} />
                 </div>
               </div>
             </div>
@@ -283,7 +310,7 @@ export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, 
               <div className={cn('h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ring-1 ring-black/5 dark:ring-white/5', config.bgColor)}>
                 <SubjectIcon className={cn('h-5 w-5', config.color)} />
               </div>
-              <StatusBadge status={status} attempt={attempt} />
+              <StatusBadge status={status} attempt={attempt} isPending={isPending} />
             </div>
             <h3 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-2 leading-snug">{exam.title}</h3>
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 mb-3">{exam.subject}</p>
@@ -326,7 +353,7 @@ export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, 
               </p>
             )}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-              <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth />
+              <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth isCompleted={isCompleted} />
             </div>
           </div>
         </CardContent>
