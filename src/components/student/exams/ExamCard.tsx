@@ -2,6 +2,9 @@
 // src/components/student/exams/ExamCard.tsx
 'use client'
 
+import React from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -180,25 +183,56 @@ function ActionButton({ status, attempt, examId, onTakeExam, onViewResult, fullW
   status: ExamStatus; attempt?: ExamAttempt; examId: string
   onTakeExam: (id: string) => void; onViewResult: (id: string) => void; fullWidth?: boolean; isCompleted?: boolean
 }) {
-  const base = cn('h-8 text-xs font-semibold gap-1.5 rounded-xl transition-all duration-150 cursor-pointer', fullWidth && 'w-full')
+  const router = useRouter()
+  const base = cn(
+    'h-8 text-xs font-semibold gap-1.5 rounded-xl transition-all duration-150 cursor-pointer inline-flex items-center justify-center px-3',
+    fullWidth && 'w-full'
+  )
   
-  if (isCompleted || status === 'completed') return (
-    <Button size="sm" onClick={() => onViewResult(attempt?.id || examId)} className={cn(base, 'bg-slate-900 dark:bg-slate-100 hover:bg-slate-700 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm')}>
-      <Eye className="h-3.5 w-3.5" /> View Result <ArrowRight className="h-3 w-3 ml-0.5 opacity-60" />
-    </Button>
-  )
-  if (status === 'upcoming') return (
-    <Button size="sm" disabled variant="outline" className={cn(base, 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed')}>
-      <Clock className="h-3.5 w-3.5" /> Not Yet Open
-    </Button>
-  )
-  if (attempt?.status === 'in_progress') return (
-    <Button size="sm" onClick={() => onTakeExam(examId)} className={cn(base, 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm')}>
-      <Zap className="h-3.5 w-3.5" /> Resume
-    </Button>
-  )
+  // Guarantee target is strictly the EXAM ID
+  const targetExamId = examId || attempt?.exam_id || ''
+
+  if (isCompleted || status === 'completed') {
+    return (
+      <Link
+        href={`/student/exams/${targetExamId}`}
+        onClick={() => {
+          if (onViewResult && targetExamId) {
+            try {
+              onViewResult(targetExamId)
+            } catch (err) {
+              console.error('onViewResult error:', err)
+            }
+          }
+        }}
+        className={cn(
+          base,
+          'bg-slate-900 dark:bg-slate-100 hover:bg-slate-700 dark:hover:bg-white text-white dark:text-slate-900 shadow-sm'
+        )}
+      >
+        <Eye className="h-3.5 w-3.5" /> View Result <ArrowRight className="h-3 w-3 ml-0.5 opacity-60" />
+      </Link>
+    )
+  }
+
+  if (status === 'upcoming') {
+    return (
+      <Button size="sm" disabled variant="outline" className={cn(base, 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed')}>
+        <Clock className="h-3.5 w-3.5" /> Not Yet Open
+      </Button>
+    )
+  }
+
+  if (attempt?.status === 'in_progress') {
+    return (
+      <Button size="sm" onClick={() => onTakeExam(targetExamId)} className={cn(base, 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm')}>
+        <Zap className="h-3.5 w-3.5" /> Resume
+      </Button>
+    )
+  }
+
   return (
-    <Button size="sm" onClick={() => onTakeExam(examId)} className={cn(base, 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm')}>
+    <Button size="sm" onClick={() => onTakeExam(targetExamId)} className={cn(base, 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm')}>
       <Play className="h-3.5 w-3.5" /> Start Exam
     </Button>
   )
@@ -236,6 +270,7 @@ export function ExamCard({ exam, attempt: propAttempt, status: propStatus, confi
 
   const status: ExamStatus = isCompleted ? 'completed' : (propStatus || (inProgress ? 'in_progress' : 'available'))
   const accent = accentCls(status, isPending, inProgress)
+  const resolvedExamId = exam.id || (exam as any).exam_id || attempt?.exam_id || ''
 
   if (viewMode === 'list') {
     return (
@@ -273,7 +308,7 @@ export function ExamCard({ exam, attempt: propAttempt, status: propStatus, confi
                     </div>
                   )}
                   <div className="hidden sm:flex shrink-0 ml-1">
-                    <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} isCompleted={isCompleted} />
+                    <ActionButton status={status} attempt={attempt} examId={resolvedExamId} onTakeExam={onTakeExam} onViewResult={onViewResult} isCompleted={isCompleted} />
                   </div>
                 </div>
                 <div className="sm:hidden mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
@@ -286,7 +321,7 @@ export function ExamCard({ exam, attempt: propAttempt, status: propStatus, confi
                       </div>
                     </div>
                   )}
-                  <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth={!isCompleted} isCompleted={isCompleted} />
+                  <ActionButton status={status} attempt={attempt} examId={resolvedExamId} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth={!isCompleted} isCompleted={isCompleted} />
                 </div>
               </div>
             </div>
@@ -353,7 +388,7 @@ export function ExamCard({ exam, attempt: propAttempt, status: propStatus, confi
               </p>
             )}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-              <ActionButton status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth isCompleted={isCompleted} />
+              <ActionButton status={status} attempt={attempt} examId={resolvedExamId} onTakeExam={onTakeExam} onViewResult={onViewResult} fullWidth isCompleted={isCompleted} />
             </div>
           </div>
         </CardContent>
