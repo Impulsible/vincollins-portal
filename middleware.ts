@@ -1,19 +1,18 @@
-// middleware.ts - FIXED VERSION
+// middleware.ts - ZERO-LOG, ZERO-EGRESS CACHED VERSION (FULLY TYPE-SAFE)
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// ── Route config ──────────────────────────────────────────────────────────────
-const PROTECTED_ROUTES = {
+// ── Protected Route Configuration ─────────────────────────────────────────────
+const PROTECTED_ROUTES: Record<string, string[]> = {
   '/admin': ['admin'],
-  '/staff': ['staff', 'admin'],   // admin can also view staff
+  '/staff': ['staff', 'admin'],
   '/student': ['student'],
-} as const
+}
 
 const AUTH_ROUTES = ['/portal', '/admin/portal']
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getRedirectForRole(role: string, baseUrl: string): string {
+function getRedirectForRole(role: string): string {
   const map: Record<string, string> = {
     admin: '/admin',
     staff: '/staff',
@@ -24,39 +23,26 @@ function getRedirectForRole(role: string, baseUrl: string): string {
 
 function getRequiredRoles(pathname: string): string[] | null {
   for (const [route, roles] of Object.entries(PROTECTED_ROUTES)) {
-    if (pathname.startsWith(route)) return [...roles]
+    if (pathname.startsWith(route)) return roles
   }
   return null
 }
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// ── Middleware Handler ────────────────────────────────────────────────────────
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: req.headers } })
   const pathname = req.nextUrl.pathname
 
-  // ✅ Debug: Log the current path
-  console.log('🔍 Middleware - Path:', pathname)
-
-  // ✅ Skip middleware for staff exam sub-routes (let them pass through)
-  // This prevents the middleware from interfering with /staff/exams/[id]/submissions
+  // Skip subroutes like staff exam reviews
   if (pathname.startsWith('/staff/exams/')) {
-    console.log('✅ Staff exam route - allowing through:', pathname)
     return res
   }
 
-  // Validate env — fail fast in dev, log in prod
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
-    console.error('[Middleware] Missing Supabase environment variables')
-    if (process.env.NODE_ENV === 'development') {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
-    }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return res
   }
 
-  // Build supabase client with cookie forwarding
+  // Supabase client with cookie persistence
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -66,104 +52,85 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
+            req.cookies.set(name, value)
             res.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
-  // Get session — use getUser() not getSession() for server-side (more secure)
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  // 1. Get authenticated user
+  const { data: { user } } = await supabase.auth.getUser()
+  const isLoggedIn = Boolean(user)
 
-  if (userError) {
-    console.warn('[Middleware] Auth error:', userError.message)
-  }
-
-  const isLoggedIn = !!user
-
-  // ── Auth pages (portal/login) ─────────────────────────────────────────────
   const isAuthPage = AUTH_ROUTES.some((r) => pathname.startsWith(r))
-
-  if (isAuthPage && isLoggedIn) {
-    // User is logged in but on login page — redirect to their dashboard
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role) {
-        const destination = getRedirectForRole(profile.role, req.url)
-        return NextResponse.redirect(new URL(destination, req.url))
-      }
-    } catch (err) {
-      console.warn('[Middleware] Profile fetch error:', err)
-    }
-    // If profile fetch fails, let them stay on portal
-    return res
-  }
-
-  // ── Protected routes ──────────────────────────────────────────────────────
   const requiredRoles = getRequiredRoles(pathname)
 
-  if (requiredRoles) {
-    // Not logged in — send to portal
-    if (!isLoggedIn) {
-      const url = new URL('/portal', req.url)
-      url.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(url)
+  // 2. Handle protected or auth routes
+  if (isLoggedIn && (isAuthPage || requiredRoles)) {
+    // Read cached role from cookie to prevent repeated DB queries
+    let userRole = req.cookies.get('app_user_role')?.value
+
+    if (!userRole && user) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (profile?.role) {
+          // Strictly enforce string type for TypeScript
+          const resolvedRole: string = String(profile.role).toLowerCase()
+          userRole = resolvedRole
+
+          // Store role in cookie for 1 hour (fixes TS Error 2345)
+          res.cookies.set('app_user_role', resolvedRole, {
+            path: '/',
+            maxAge: 3600,
+            sameSite: 'lax',
+            httpOnly: false,
+          })
+        }
+      } catch {
+        // Fallback gracefully without crash
+      }
     }
 
-    // Logged in — check role
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+    // A. Logged in user visiting login page -> route to dashboard
+    if (isAuthPage && userRole) {
+      const destination = getRedirectForRole(userRole)
+      return NextResponse.redirect(new URL(destination, req.url))
+    }
 
-      const userRole = profile?.role?.toLowerCase()
-
-      if (!userRole || !requiredRoles.includes(userRole)) {
-        // Wrong role — redirect to their correct dashboard
-        const destination = userRole
-          ? getRedirectForRole(userRole, req.url)
-          : '/portal'
-
-        console.warn(
-          `[Middleware] Role mismatch: user has "${userRole}", route requires "${requiredRoles.join('|')}"`
-        )
-
+    // B. Role-based route guard
+    if (requiredRoles && userRole) {
+      if (!requiredRoles.includes(userRole)) {
+        const destination = getRedirectForRole(userRole)
         return NextResponse.redirect(new URL(destination, req.url))
       }
-    } catch (err) {
-      console.error('[Middleware] Role check failed:', err)
-      // On error — safer to send to portal than allow access
-      return NextResponse.redirect(new URL('/portal', req.url))
     }
+  }
+
+  // 3. Unauthenticated user accessing protected route -> redirect to portal
+  if (!isLoggedIn && requiredRoles) {
+    const url = new URL('/portal', req.url)
+    url.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(url)
   }
 
   return res
 }
 
+// ── Matcher ───────────────────────────────────────────────────────────────────
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/student/:path*',
     '/staff/:path*',
+    '/student/:path*',
     '/portal',
-    '/',
-    /*
-     * Skip:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.png
-     * - public assets
-     * - api routes
-     */
-    '/((?!_next/static|_next/image|favicon|images|sw\\.js|manifest\\.json|offline\\.html|api).*)',
+    '/admin/portal',
   ],
 }
