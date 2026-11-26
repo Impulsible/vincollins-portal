@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -421,35 +422,76 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
 
       attemptsForTerm.forEach((a: any) => {
         const examDef = examDefMap[a.exam_id]
-        const ca = caMap[a.exam_id]
-        const hasCA = ca && (ca.ca1_score || ca.ca2_score || ca.ca_total)
+        
+        // Match CA by exam_id or by subject
+        const ca = caMap[a.exam_id] || caScoresData?.find((c: any) => 
+          isTermMatch(c.term, targetTerm) &&
+          (c.academic_year === targetSession || c.session_year === targetSession) &&
+          ((c.subject_id && examDef?.subject_id && c.subject_id === examDef.subject_id) ||
+           (c.subject && examDef?.subject && c.subject.toLowerCase() === examDef.subject.toLowerCase()))
+        )
 
         let objectiveMax = Number(examDef?.objective_max) || Number(a.objective_total) || 0
-        if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30
-        const theoryMax = Math.max(0, 60 - objectiveMax)
+        if (objectiveMax <= 0 && examDef?.questions) {
+          try {
+            const qs = typeof examDef.questions === 'string' ? JSON.parse(examDef.questions) : examDef.questions
+            if (Array.isArray(qs)) {
+              qs.forEach((q: any) => {
+                if (q.type !== 'theory' && !q.is_theory) {
+                  objectiveMax += Number(q.marks || q.points || 0.5)
+                }
+              })
+            }
+          } catch { /* ignore */ }
+        }
+        if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 20
+        const theoryMax = examDef?.theory_max != null ? Number(examDef.theory_max) : Math.max(0, 60 - objectiveMax)
 
         const objectiveScore = Number(a.objective_score) || 0
-        const theoryScore = Number(a.theory_score) || 0
-        const ca1 = ca?.ca1_score || 0
-        const ca2 = ca?.ca2_score || 0
-        const caTotal = ca?.ca_total || (ca1 + ca2)
+        let theoryScore = a.theory_score != null ? Number(a.theory_score) : null
+        let teacherFeedback: string | null = null
 
+        if (a.theory_feedback) {
+          try {
+            const fb = typeof a.theory_feedback === 'string' ? JSON.parse(a.theory_feedback) : a.theory_feedback
+            if (fb?.total?.score != null) theoryScore = Number(fb.total.score)
+            if (fb?.total?.feedback) teacherFeedback = fb.total.feedback
+          } catch {
+            teacherFeedback = typeof a.theory_feedback === 'string' ? a.theory_feedback : null
+          }
+        }
+
+        const ca1 = Number(ca?.ca1_score) || 0
+        const ca2 = Number(ca?.ca2_score) || 0
+        const caTotal = ca?.ca_total != null ? Number(ca.ca_total) : (ca1 + ca2)
+        const hasCA = !!(ca && (ca.ca1_score != null || ca.ca2_score != null || ca.ca_total != null || caTotal > 0))
+
+        // Check if theory is pending
+        const isTheoryPending =
+          a.status === 'pending_theory' ||
+          (theoryMax > 0 && theoryScore === null && !teacherFeedback)
+
+        // Standardized 3-tier progressive score calculation
         let percentage: number
         let totalScore: number
 
-        if (hasCA) {
-          totalScore = caTotal + objectiveScore + theoryScore
+        if (isTheoryPending) {
+          // Tier 1: Objective only
+          totalScore = objectiveScore
+          percentage = objectiveMax > 0 ? Math.round((objectiveScore / objectiveMax) * 100) : 0
+        } else if (hasCA && caTotal > 0) {
+          // Tier 3: Full Composite (CA 40 + Exam 60 = 100)
+          totalScore = caTotal + objectiveScore + (theoryScore || 0)
           percentage = Math.round((totalScore / 100) * 100)
-        } else if (theoryScore > 0 || theoryMax > 0) {
-          const examTotal = objectiveScore + theoryScore
-          totalScore = Math.round((examTotal / 60) * 100)
-          percentage = totalScore
-        } else if (objectiveScore > 0 && objectiveMax > 0) {
-          totalScore = Math.round((objectiveScore / objectiveMax) * 100)
-          percentage = totalScore
+        } else if ((theoryScore || 0) > 0 || !isTheoryPending) {
+          // Tier 2: Combined Exam (Objective + Theory = 60)
+          const examTotal = objectiveScore + (theoryScore || 0)
+          const examMax = objectiveMax + theoryMax || 60
+          totalScore = examTotal
+          percentage = examMax > 0 ? Math.round((examTotal / examMax) * 100) : 0
         } else {
-          totalScore = 0
-          percentage = 0
+          totalScore = objectiveScore
+          percentage = objectiveMax > 0 ? Math.round((objectiveScore / objectiveMax) * 100) : 0
         }
 
         percentage = Math.min(Math.max(Number(percentage) || 0, 0), 100)
@@ -460,12 +502,12 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           status: a.status, 
           percentage: percentage,
           total_score: totalScore,
-          total_marks: 100,
+          total_marks: isTheoryPending ? objectiveMax : (hasCA ? 100 : (objectiveMax + theoryMax || 60)),
           objective_score: objectiveScore,
           objective_total: objectiveMax,
           theory_score: theoryScore,
           theory_total: theoryMax,
-          theory_feedback: a.theory_feedback || null,
+          theory_feedback: teacherFeedback,
           term: a.term || targetTerm,
           session_year: a.session_year || targetSession,
           attempted_at: a.created_at || new Date().toISOString(),
@@ -483,6 +525,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           has_ca: hasCA,
           grade: getSchoolGrade(percentage),
           is_passed: percentage >= 50,
+          is_theory_pending: isTheoryPending,
         }
         am[a.exam_id] = attemptObj as ExamAttempt
       })
@@ -575,7 +618,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       setExamAttempts(am)
 
       // Calculate stats directly from actual CBT attempts
-      const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory')
+      const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory' || (a as any).is_theory_pending)
       const pendingTheoryCount = pendingTheoryAttempts.length
       const subjectStats = buildSubjectStats(filteredExams, am)
       

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/student/exams/ExamCard.tsx
 'use client'
 
@@ -41,31 +42,48 @@ interface ScoreData { displayPct: number; displayScore: number; displayTotal: nu
 
 const calcScore = (attempt?: ExamAttempt): ScoreData => {
   if (!attempt) return { displayPct: 0, displayScore: 0, displayTotal: 100, hasCA: false, isPending: false }
+  
+  const isPending = attempt.status === 'pending_theory' || Boolean((attempt as any).is_theory_pending)
+  const ca1 = Number(attempt.ca1_score) || 0
+  const ca2 = Number(attempt.ca2_score) || 0
+  const caTotal = Number((attempt as any).ca_total_score) || (ca1 + ca2)
   const hasCA = !!(attempt.ca1_score !== undefined && attempt.ca1_score !== null) || 
                 !!(attempt as any).hasCA || !!(attempt as any).has_ca ||
-                !!(attempt as any).ca_total_score
-  const isPending = attempt.status === 'pending_theory'
-  const obj = attempt.objective_score || 0
-  const theory = attempt.theory_score || 0
-  const ca1 = attempt.ca1_score || 0
-  const ca2 = attempt.ca2_score || 0
-  const caTotal = (attempt as any).ca_total_score || (ca1 + ca2)
-  const objMax = attempt.objective_total || 30
+                (caTotal > 0)
+                
+  const obj = Number(attempt.objective_score) || 0
+  const theory = Number(attempt.theory_score) || 0
+  const objMax = Number(attempt.objective_total) || 20
+  const theoryMax = Number(attempt.theory_total) || Math.max(0, 60 - objMax)
   
-  let displayScore = 0, displayTotal = 100
-  if (hasCA) { displayScore = caTotal + obj + theory; displayTotal = 100 }
-  else if (theory > 0) { displayScore = obj + theory; displayTotal = 60 }
-  else if (obj > 0 && objMax > 0) { displayScore = obj; displayTotal = objMax }
+  let displayScore = 0
+  let displayTotal = 100
+
+  if (isPending) {
+    displayScore = obj
+    displayTotal = objMax
+  } else if (hasCA && caTotal > 0) {
+    displayScore = caTotal + obj + theory
+    displayTotal = 100
+  } else if (theory > 0 || (attempt as any).status === 'graded' || (attempt as any).status === 'completed') {
+    displayScore = obj + theory
+    displayTotal = objMax + theoryMax || 60
+  } else {
+    displayScore = obj
+    displayTotal = objMax
+  }
 
   const storedPct = attempt.percentage
-  const displayPct = storedPct != null && storedPct > 0
+  const displayPct = isPending && objMax > 0
+    ? Math.min(Math.max(Math.round((obj / objMax) * 100), 0), 100)
+    : storedPct != null && storedPct > 0
     ? Math.min(Math.max(Math.round(storedPct), 0), 100)
     : Math.min(Math.max(Math.round((displayScore / (displayTotal || 1)) * 100), 0), 100)
 
   return { 
     displayPct, 
-    displayScore: storedPct != null && storedPct > 0 ? storedPct : displayScore, 
-    displayTotal: storedPct != null && storedPct > 0 ? 100 : displayTotal, 
+    displayScore, 
+    displayTotal, 
     hasCA, 
     isPending 
   }
@@ -80,8 +98,9 @@ const STATUS_MAP = {
 } as const
 
 function StatusBadge({ status, attempt }: { status: ExamStatus; attempt?: ExamAttempt }) {
+  const isPending = attempt?.status === 'pending_theory' || Boolean((attempt as any)?.is_theory_pending)
   const key =
-    status === 'completed' && attempt?.status === 'pending_theory' ? 'completed_pending'
+    status === 'completed' && isPending ? 'completed_pending'
     : status === 'completed' ? 'completed'
     : status === 'upcoming' ? 'upcoming'
     : attempt?.status === 'in_progress' ? 'in_progress'
@@ -94,9 +113,6 @@ function StatusBadge({ status, attempt }: { status: ExamStatus; attempt?: ExamAt
   )
 }
 
-// ✅ Correct Score Breakdown labeling logic:
-// If there is a separate theory_score, label objective as 'Obj' and theory as 'Theory'.
-// If there is NO separate theory_score, label the exam score as 'Exam'!
 function ScoreBreakdown({ attempt, hasCA }: { attempt: ExamAttempt; hasCA: boolean }) {
   const parts: { label: string; value: number }[] = []
 
@@ -106,10 +122,10 @@ function ScoreBreakdown({ attempt, hasCA }: { attempt: ExamAttempt; hasCA: boole
   }
 
   const hasSeparateTheory = (attempt.theory_score || 0) > 0
+  const isPending = attempt.status === 'pending_theory' || Boolean((attempt as any).is_theory_pending)
 
   if ((attempt.objective_score || 0) > 0) {
-    // If theory score exists separately, label objective as "Obj". Otherwise, label as "Exam"!
-    const label = hasSeparateTheory ? 'Obj' : 'Exam'
+    const label = hasSeparateTheory || isPending ? 'Obj' : 'Exam'
     parts.push({ label, value: attempt.objective_score! })
   }
 

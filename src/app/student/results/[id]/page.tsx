@@ -17,27 +17,49 @@ import {
   Clock, CheckCircle, XCircle, BookOpen, GraduationCap,
   Calendar, ArrowLeft, Home, ChevronRight, AlertCircle,
   Trophy, Target, BarChart3, Award, CheckCheck,
-  X, Loader2, Minus, Printer, Star, BookMarked,
+  X, Loader2, Minus, Printer, Star, BookMarked, ShieldAlert
 } from 'lucide-react'
 import Link from 'next/link'
 
 // ─── Types ───────────────────────────────────────────
 interface ExamResult {
-  id: string; exam_id: string; exam_title: string; exam_subject: string
-  exam_class: string; status: string; percentage: number; total_score: number
-  total_marks: number; objective_score: number; objective_total: number
-  theory_score: number | null; theory_total: number
-  ca1_score: number | null; ca2_score: number | null
-  is_passed: boolean; submitted_at: string; passing_percentage: number
-  time_spent: number; correct_count: number; incorrect_count: number
-  unanswered_count: number; teacher_feedback: string | null
-  term?: string; academic_year?: string
+  id: string
+  exam_id: string
+  exam_title: string
+  exam_subject: string
+  exam_class: string
+  status: string
+  percentage: number
+  total_score: number
+  total_marks: number
+  objective_score: number
+  objective_total: number
+  theory_score: number | null
+  theory_total: number
+  ca1_score: number | null
+  ca2_score: number | null
+  is_passed: boolean
+  submitted_at: string
+  passing_percentage: number
+  time_spent: number
+  correct_count: number
+  incorrect_count: number
+  unanswered_count: number
+  teacher_feedback: string | null
+  term?: string
+  academic_year?: string
   exam_combined?: boolean
+  is_score_halved?: boolean
+  theory_pending?: boolean
 }
 
 interface StudentProfile {
-  id: string; full_name: string; email: string; class: string
-  department: string; photo_url?: string
+  id: string
+  full_name: string
+  email: string
+  class: string
+  department: string
+  photo_url?: string
 }
 
 // ─── Helpers ─────────────────────────────────────────
@@ -55,7 +77,9 @@ const getGradeConfig = (percentage: number) => {
 
 const fmtTime = (seconds?: number) => {
   if (!seconds || seconds <= 0) return '—'
-  const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
   if (h > 0) return `${h}h ${m}m`
   if (m > 0) return `${m}m ${s}s`
   return `${s}s`
@@ -63,8 +87,11 @@ const fmtTime = (seconds?: number) => {
 
 const fmtDate = (date?: string) => {
   if (!date) return '—'
-  try { return new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }
-  catch { return '—' }
+  try {
+    return new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  } catch {
+    return '—'
+  }
 }
 
 const getTermLabel = (value: string) => {
@@ -79,7 +106,8 @@ const getTermLabel = (value: string) => {
 
 const isTermMatch = (a?: string, b?: string) => {
   if (!a || !b) return false
-  const x = a.toLowerCase(), y = b.toLowerCase()
+  const x = a.toLowerCase()
+  const y = b.toLowerCase()
   if (x === y) return true
   if (x.includes('third') || x.includes('3rd')) return y.includes('third') || y.includes('3rd')
   if (x.includes('second') || x.includes('2nd')) return y.includes('second') || y.includes('2nd')
@@ -239,7 +267,6 @@ export default function StudentResultDetailPage() {
         const rcTerm = rc.term || termParam
         const rcSession = rc.academic_year || rc.session_year || sessionYearParam
 
-        // ── Try to find matching CBT attempt for Obj + Theory breakdown ──
         let objectiveScore = 0
         let objectiveMax = 0
         let theoryScore = 0
@@ -251,6 +278,7 @@ export default function StudentResultDetailPage() {
         let teacherFeedback: string | null = subj.remark || null
         let status = 'completed'
         let submittedAt = rc.created_at || new Date().toISOString()
+        let isScoreHalved = false
 
         const { data: matchingExams } = await supabase
           .from('exams')
@@ -280,7 +308,7 @@ export default function StudentResultDetailPage() {
             .eq('exam_id', examMatch.id)
             .maybeSingle()
 
-          objectiveMax = Number(examMatch.objective_max) || 0
+          objectiveMax = Number(att?.objective_total) || Number(examMatch.objective_max) || 0
           if (objectiveMax <= 0 && examMatch.questions) {
             try {
               const qs = typeof examMatch.questions === 'string' ? JSON.parse(examMatch.questions) : examMatch.questions
@@ -293,10 +321,13 @@ export default function StudentResultDetailPage() {
               }
             } catch { /* ignore */ }
           }
-          if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30
-          theoryMax = Math.max(0, 60 - objectiveMax)
+          if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 20
+          theoryMax = examMatch.theory_max != null ? Number(examMatch.theory_max) : Math.max(0, 60 - objectiveMax)
 
           if (att) {
+            const hasViolations = ((att.tab_switches || 0) > 0) || ((att.fullscreen_exits || 0) > 0) || ((att.warnings || 0) > 0)
+            isScoreHalved = Boolean(att.is_score_halved) && hasViolations
+
             objectiveScore = Number(att.objective_score) || 0
             theoryScore = Number(att.theory_score) || 0
             if (!theoryScore && att.theory_feedback) {
@@ -327,8 +358,28 @@ export default function StudentResultDetailPage() {
           theoryMax = 0
         }
 
-        const grandTotal = caTotal + objectiveScore + theoryScore
-        const percentage = Math.min(100, Math.round(total || grandTotal))
+        const isTheoryPending = status === 'pending_theory' || (theoryMax > 0 && theoryScore === 0 && !teacherFeedback && hasSplit)
+
+        let finalPercentage = 0
+        let totalScore = 0
+        let totalMarks = 100
+
+        if (isTheoryPending) {
+          totalScore = objectiveScore
+          totalMarks = objectiveMax
+          finalPercentage = objectiveMax > 0 ? Math.round((objectiveScore / objectiveMax) * 100) : 0
+        } else if (caTotal > 0) {
+          totalScore = caTotal + objectiveScore + theoryScore
+          totalMarks = 100
+          finalPercentage = Math.round(total || (totalScore / totalMarks) * 100)
+        } else {
+          const examMax = objectiveMax + theoryMax || 60
+          totalScore = objectiveScore + theoryScore
+          totalMarks = examMax
+          finalPercentage = examMax > 0 ? Math.round((totalScore / examMax) * 100) : 0
+        }
+
+        finalPercentage = Math.min(100, Math.max(0, finalPercentage))
 
         setResult({
           id: examId,
@@ -337,16 +388,16 @@ export default function StudentResultDetailPage() {
           exam_subject: subjectName,
           exam_class: rc.class || pd.class || '—',
           status,
-          percentage,
-          total_score: percentage,
-          total_marks: 100,
+          percentage: finalPercentage,
+          total_score: totalScore,
+          total_marks: totalMarks,
           objective_score: objectiveScore,
           objective_total: objectiveMax,
           theory_score: theoryScore,
           theory_total: theoryMax,
-          ca1_score: caTotal,
+          ca1_score: caTotal > 0 ? caTotal : null,
           ca2_score: 0,
-          is_passed: percentage >= 40,
+          is_passed: finalPercentage >= (examMatch?.passing_percentage || 40),
           submitted_at: submittedAt,
           passing_percentage: examMatch?.passing_percentage || 40,
           time_spent: timeSpent,
@@ -357,13 +408,15 @@ export default function StudentResultDetailPage() {
           term: rcTerm,
           academic_year: rcSession,
           exam_combined: !hasSplit,
+          is_score_halved: isScoreHalved,
+          theory_pending: isTheoryPending,
         })
         setLoading(false)
         return
       }
 
       // ═══════════════════════════════════════════════
-      // PATH B: Normal CBT exam ID
+      // PATH B: Standard CBT exam attempt
       // ═══════════════════════════════════════════════
       let attemptQuery = supabase
         .from('exam_attempts')
@@ -405,7 +458,8 @@ export default function StudentResultDetailPage() {
         .eq('exam_id', examId)
         .maybeSingle()
 
-      let objectiveMax = Number(exam?.objective_max) || 0
+      // 1. Establish Objective Maximum
+      let objectiveMax = Number(att.objective_total) || Number(exam?.objective_max) || 0
       if (objectiveMax === 0 && exam?.questions) {
         try {
           const questions = typeof exam.questions === 'string' ? JSON.parse(exam.questions) : exam.questions
@@ -416,47 +470,71 @@ export default function StudentResultDetailPage() {
               }
             })
           }
-        } catch (e) { console.error(e) }
+        } catch (e) {
+          console.error('Error parsing questions for objective max:', e)
+        }
       }
-      if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30
-      const theoryMax = Math.max(0, 60 - objectiveMax)
+      if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 20
 
-      let theoryScore: number | null = Number(att.theory_score) || null
+      // 2. Establish Theory Maximum (Dynamically 60 - objectiveMax)
+      const configuredTheoryMax = exam?.theory_max != null ? Number(exam.theory_max) : null
+      const theoryMax = configuredTheoryMax !== null ? configuredTheoryMax : Math.max(0, 60 - objectiveMax)
+
+      let theoryScore: number | null = att.theory_score != null ? Number(att.theory_score) : null
       let teacherFeedback: string | null = null
       if (att.theory_feedback) {
         try {
           const fb = typeof att.theory_feedback === 'string' ? JSON.parse(att.theory_feedback) : att.theory_feedback
           if (fb?.total?.score != null) theoryScore = Number(fb.total.score)
           if (fb?.total?.feedback) teacherFeedback = fb.total.feedback
-        } catch { /* ignore */ }
+        } catch {
+          teacherFeedback = typeof att.theory_feedback === 'string' ? att.theory_feedback : null
+        }
       }
 
+      // Check if theory is pending grading
+      const isTheoryPending =
+        att.status === 'pending_theory' ||
+        (theoryMax > 0 && theoryScore === null && !teacherFeedback)
+
+      // Guard proctoring score halving against zero violations
+      const hasViolations = ((att.tab_switches || 0) > 0) || ((att.fullscreen_exits || 0) > 0) || ((att.warnings || 0) > 0)
+      const isActuallyHalved = Boolean(att.is_score_halved) && hasViolations
+
+      // Continuous Assessment
       const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
-      const caTotalValue = Number(ca?.ca_total) || ((ca1 || 0) + (ca2 || 0))
+      const caTotalValue = ca?.ca_total != null ? Number(ca.ca_total) : ((ca1 || 0) + (ca2 || 0))
       const hasCA = ca1 != null || ca?.ca_total != null || caTotalValue > 0
 
-      const objectiveScore = Number(att.objective_score) || 0
-      const theoryValue = theoryScore || 0
+      const objectiveScore = Math.max(0, Number(att.objective_score) || 0)
+      const theoryValue = Math.max(0, theoryScore || 0)
 
-      let percentage: number
-      let totalScore: number
-      let totalMarks: number
+      let percentage = 0
+      let totalScore = 0
+      let totalMarks = 100
 
-      if (hasCA) {
+      // Progressive Calculation Engine:
+      if (isTheoryPending) {
+        // Stage 1: Objective Only (e.g. 10/20 = 50%)
+        totalScore = objectiveScore
+        totalMarks = objectiveMax
+        percentage = objectiveMax > 0 ? Math.round((objectiveScore / objectiveMax) * 100) : 0
+      } else if (hasCA && caTotalValue > 0) {
+        // Stage 3: Full Composite (CA 40 + Exam 60 = 100)
         totalScore = caTotalValue + objectiveScore + theoryValue
         totalMarks = 100
         percentage = Math.round((totalScore / totalMarks) * 100)
-      } else if (theoryValue > 0 || theoryMax > 0) {
-        totalScore = objectiveScore + theoryValue
-        totalMarks = 60
-        percentage = Math.round((totalScore / totalMarks) * 100)
       } else {
-        totalScore = objectiveScore
-        totalMarks = objectiveMax || 60
-        percentage = Math.round((totalScore / totalMarks) * 100)
+        // Stage 2: Combined Exam Only (Objective + Theory = 60)
+        const examMax = objectiveMax + theoryMax || 60
+        totalScore = objectiveScore + theoryValue
+        totalMarks = examMax
+        percentage = examMax > 0 ? Math.round((totalScore / examMax) * 100) : 0
       }
-      percentage = Math.min(percentage, 100)
+
+      percentage = Math.min(Math.max(percentage, 0), 100)
+      const passMark = exam?.passing_percentage || 40
 
       setResult({
         id: att.id || examId,
@@ -470,13 +548,13 @@ export default function StudentResultDetailPage() {
         total_marks: totalMarks,
         objective_score: objectiveScore,
         objective_total: objectiveMax,
-        theory_score: theoryValue,
+        theory_score: theoryScore,
         theory_total: theoryMax,
         ca1_score: hasCA ? caTotalValue : null,
         ca2_score: 0,
-        is_passed: percentage >= 40,
-        submitted_at: att.submitted_at || new Date().toISOString(),
-        passing_percentage: exam?.passing_percentage || 40,
+        is_passed: percentage >= passMark,
+        submitted_at: att.submitted_at || att.completed_at || new Date().toISOString(),
+        passing_percentage: passMark,
         time_spent: att.time_spent || 0,
         correct_count: att.correct_count || 0,
         incorrect_count: att.incorrect_count || 0,
@@ -485,9 +563,11 @@ export default function StudentResultDetailPage() {
         term: exam?.term || termParam,
         academic_year: exam?.session_year || sessionYearParam,
         exam_combined: false,
+        is_score_halved: isActuallyHalved,
+        theory_pending: isTheoryPending,
       })
     } catch (err) {
-      console.error(err)
+      console.error('Error fetching exam result:', err)
       setError('Failed to load result. Please try again.')
     } finally {
       setLoading(false)
@@ -519,7 +599,7 @@ export default function StudentResultDetailPage() {
               </div>
               <div>
                 <p className="font-semibold text-slate-700 dark:text-slate-200">Loading your result</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Fetching exam details...</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Calculating verified scores...</p>
               </div>
             </div>
           </div>
@@ -555,15 +635,13 @@ export default function StudentResultDetailPage() {
     )
   }
 
-  // ── Derived ────────────────────────────────────────
+  // ── Derived State ──────────────────────────────────
   const gradeConfig = getGradeConfig(result.percentage)
   const GradeIcon = gradeConfig.icon
   const hasCA = result.ca1_score != null
   const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
   const theoryScore = result.theory_score || 0
-  const theoryPending =
-    result.status === 'pending_theory' ||
-    (result.theory_total > 0 && theoryScore === 0 && !result.exam_combined)
+  const theoryPending = Boolean(result.theory_pending)
   const showTheoryRow = result.theory_total > 0 && !result.exam_combined
   const showCombinedExam = !!result.exam_combined || (result.theory_total === 0 && result.objective_total >= 60)
 
@@ -615,6 +693,7 @@ export default function StudentResultDetailPage() {
                 </div>
               </motion.nav>
 
+              {/* Term & Session Meta */}
               {result.term && result.academic_year && (
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5">
                   <Calendar className="h-3 w-3 text-slate-400 dark:text-slate-500" />
@@ -626,40 +705,80 @@ export default function StudentResultDetailPage() {
                 </div>
               )}
 
+              {/* Proctoring Halved Alert */}
+              {result.is_score_halved && (
+                <div className="flex items-center gap-2.5 p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-2xl text-xs text-rose-800 dark:text-rose-300">
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                  <span>
+                    <strong>Proctoring Penalty Applied:</strong> Exam score was reduced by 50% due to recorded violations during examination testing.
+                  </span>
+                </div>
+              )}
+
               {/* Hero Banner */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
                 <div className="rounded-3xl overflow-hidden shadow-xl border border-transparent dark:border-slate-800">
-                  <div className={cn('h-1.5 w-full', result.is_passed ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400' : 'bg-gradient-to-r from-red-400 via-rose-400 to-pink-400')} />
+                  <div
+                    className={cn(
+                      'h-1.5 w-full',
+                      theoryPending
+                        ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500'
+                        : result.is_passed
+                        ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400'
+                        : 'bg-gradient-to-r from-red-400 via-rose-400 to-pink-400'
+                    )}
+                  />
                   <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-5 sm:px-8 pt-6 pb-0 relative overflow-hidden">
                     <div className="flex flex-wrap items-center gap-2 mb-4 relative">
                       <span className="flex items-center gap-1.5 text-xs text-slate-300 bg-white/10 px-3 py-1 rounded-full border border-white/10"><BookOpen className="h-3 w-3 text-blue-300" /> {result.exam_subject}</span>
                       <span className="flex items-center gap-1.5 text-xs text-slate-300 bg-white/10 px-3 py-1 rounded-full border border-white/10"><GraduationCap className="h-3 w-3 text-purple-300" /> {result.exam_class}</span>
                       <span className="flex items-center gap-1.5 text-xs text-slate-300 bg-white/10 px-3 py-1 rounded-full border border-white/10"><Calendar className="h-3 w-3 text-slate-300" /> {fmtDate(result.submitted_at)}</span>
-                      <span className={cn('ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border', theoryPending ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : result.is_passed ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-300 border-red-500/30')}>
+                      
+                      <span className={cn(
+                        'ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border',
+                        theoryPending
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          : result.is_passed
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : 'bg-red-500/20 text-red-300 border-red-500/30'
+                      )}>
                         {theoryPending ? <Clock className="h-3 w-3" /> : result.is_passed ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                         {theoryPending ? 'Pending Theory' : result.is_passed ? 'Passed' : 'Failed'}
                       </span>
                     </div>
+
                     <h1 className="text-xl sm:text-2xl font-bold text-white mb-6 relative leading-snug">{result.exam_title}</h1>
+                    
                     <div className="flex flex-col sm:flex-row items-center gap-6 relative pb-6">
                       <ScoreRing percentage={result.percentage} size={140} grade={gradeConfig} />
                       <div className="flex-1 grid grid-cols-2 gap-3 w-full">
-                        <StatPill icon={Trophy} label="Total Score" value={`${result.total_score}/${result.total_marks}`} color="text-purple-600 dark:text-purple-400" />
+                        <StatPill
+                          icon={Trophy}
+                          label={theoryPending ? "Objective Score" : "Total Score"}
+                          value={`${result.total_score}/${result.total_marks}`}
+                          color="text-purple-600 dark:text-purple-400"
+                        />
                         <StatPill icon={Star} label="Grade" value={gradeConfig.grade} color={gradeConfig.text} />
                         <StatPill icon={Clock} label="Time Spent" value={fmtTime(result.time_spent)} color="text-blue-600 dark:text-blue-400" />
                         <StatPill icon={Target} label="Pass Mark" value={`${result.passing_percentage}%`} color="text-slate-500 dark:text-slate-400" />
                       </div>
                     </div>
                   </div>
+
+                  {/* Banner Subtitle / Status Explanation */}
                   <div className={cn('px-5 sm:px-8 py-4 flex items-center gap-4 border-t', gradeConfig.bg, gradeConfig.border)}>
                     <div className={cn('h-12 w-12 rounded-2xl flex items-center justify-center shadow-md shrink-0', gradeConfig.bar)}>
                       <GradeIcon className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={cn('text-base font-bold', gradeConfig.text)}>Grade {gradeConfig.grade} — {gradeConfig.label}</p>
+                      <p className={cn('text-base font-bold', gradeConfig.text)}>
+                        {theoryPending ? `Objective Grade: ${gradeConfig.grade} (${result.percentage}%)` : `Grade ${gradeConfig.grade} — ${gradeConfig.label}`}
+                      </p>
                       <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
-                        {result.is_passed
-                          ? `Congratulations! You passed with ${result.percentage}%. Keep up the great work!`
+                        {theoryPending
+                          ? `You completed the objective section with ${result.objective_score}/${result.objective_total} (${result.percentage}%). Final grade will be computed once theory grading is submitted.`
+                          : result.is_passed
+                          ? `Congratulations! You scored ${result.percentage}%. Keep up the strong performance!`
                           : `You scored ${result.percentage}%. The pass mark is ${result.passing_percentage}%. You can do better!`}
                       </p>
                     </div>
@@ -704,16 +823,26 @@ export default function StudentResultDetailPage() {
                       {hasCA && (
                         <motion.div className="bg-blue-500" initial={{ width: 0 }} animate={{ width: `${(caTotal / 100) * 100}%` }} transition={{ duration: 0.8 }} />
                       )}
-                      <motion.div className="bg-violet-500" initial={{ width: 0 }} animate={{ width: `${(result.objective_score / 100) * 100}%` }} transition={{ duration: 0.8, delay: 0.1 }} />
+                      <motion.div
+                        className="bg-violet-500"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(result.objective_score / (hasCA ? 100 : result.total_marks)) * 100}%` }}
+                        transition={{ duration: 0.8, delay: 0.1 }}
+                      />
                       {showTheoryRow && !theoryPending && theoryScore > 0 && (
-                        <motion.div className="bg-amber-500" initial={{ width: 0 }} animate={{ width: `${(theoryScore / 100) * 100}%` }} transition={{ duration: 0.8, delay: 0.2 }} />
+                        <motion.div
+                          className="bg-amber-500"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(theoryScore / (hasCA ? 100 : result.total_marks)) * 100}%` }}
+                          transition={{ duration: 0.8, delay: 0.2 }}
+                        />
                       )}
                       <div className="bg-slate-100 dark:bg-slate-800 flex-1 rounded-r-full" />
                     </div>
 
                     <Separator className="bg-slate-100 dark:bg-slate-800" />
 
-                    {/* CA — always out of 40 */}
+                    {/* CA — out of 40 */}
                     <ScoreBar
                       label="Continuous Assessment"
                       sublabel="(40 marks)"
@@ -726,7 +855,7 @@ export default function StudentResultDetailPage() {
 
                     <Separator className="bg-slate-100 dark:bg-slate-800" />
 
-                    {/* Objective OR combined Exam */}
+                    {/* Objective Exam */}
                     <ScoreBar
                       label={showCombinedExam ? 'Exam Score' : 'Objective Exam'}
                       sublabel={showCombinedExam ? '(60 marks · Obj + Theory)' : `(${result.objective_total} marks)`}
@@ -736,7 +865,7 @@ export default function StudentResultDetailPage() {
                       delay={0.2}
                     />
 
-                    {/* Theory — only when we have a real split */}
+                    {/* Theory Section */}
                     {showTheoryRow && (
                       <>
                         <Separator className="bg-slate-100 dark:bg-slate-800" />
@@ -754,15 +883,25 @@ export default function StudentResultDetailPage() {
 
                     <Separator className="bg-slate-100 dark:bg-slate-800" />
 
-                    {/* Grand Total */}
+                    {/* Grand Total Summary */}
                     <div className={cn('flex items-center justify-between p-4 rounded-2xl border-2', gradeConfig.bg, gradeConfig.border)}>
                       <div>
-                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Grand Total</p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          {hasCA ? 'CA' : '—'} + {showCombinedExam ? 'Exam' : 'Obj'}{showTheoryRow ? ' + Theory' : ''} = 100
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {theoryPending ? 'Objective Total' : hasCA ? 'Grand Total' : 'Combined Exam Total'}
                         </p>
-                        {!hasCA && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">*CA scores pending</p>}
-                        {theoryPending && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">*Theory grading pending</p>}
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {theoryPending
+                            ? `Computed as: (${result.objective_score} / ${result.objective_total}) × 100`
+                            : hasCA
+                            ? `CA (${caTotal}) + Obj (${result.objective_score}) + Theory (${theoryScore}) = 100 marks`
+                            : `Obj (${result.objective_score}) + Theory (${theoryScore}) = ${result.total_marks} marks`}
+                        </p>
+                        {!hasCA && !theoryPending && (
+                          <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">*Continuous Assessment awaiting recording</p>
+                        )}
+                        {theoryPending && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">*Theory section pending review (Max {result.theory_total} marks)</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className={cn('text-2xl font-black', gradeConfig.text)}>
@@ -776,11 +915,11 @@ export default function StudentResultDetailPage() {
                 </Card>
               </motion.div>
 
-              {/* Teacher feedback */}
+              {/* Teacher Feedback / Remark */}
               {result.teacher_feedback && (
                 <Card className="border border-slate-200 dark:border-slate-800 shadow-sm rounded-3xl overflow-hidden bg-white dark:bg-slate-900 transition-colors">
                   <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                    <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Remark</h2>
+                    <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Teacher's Remark</h2>
                   </div>
                   <div className="p-5 sm:p-6">
                     <p className="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">&ldquo;{result.teacher_feedback}&rdquo;</p>
@@ -788,6 +927,7 @@ export default function StudentResultDetailPage() {
                 </Card>
               )}
 
+              {/* Navigation Actions */}
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button variant="outline" onClick={() => router.push('/student/results')} className="flex-1 h-11 rounded-xl border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 gap-2 cursor-pointer">
                   <ArrowLeft className="h-4 w-4" /> Back to Results
