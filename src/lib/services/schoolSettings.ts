@@ -1,3 +1,4 @@
+// src/lib/services/schoolSettings.ts
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,14 +14,17 @@ export interface SchoolSettings {
   [key: string]: any
 }
 
+// 1. In-memory cache singleton
 let memoryCache: SchoolSettings | null = null
 let inFlightPromise: Promise<SchoolSettings | null> | null = null
 
 export async function getSchoolSettings(): Promise<SchoolSettings | null> {
-  // 1. Return memory cache immediately (0ms, 0 egress)
-  if (memoryCache) return memoryCache
+  // A. Return memory cache immediately (0 ms, 0 bytes network egress)
+  if (memoryCache) {
+    return memoryCache
+  }
 
-  // 2. Return sessionStorage cache immediately (0ms, 0 egress)
+  // B. Return sessionStorage cache if available (instant page loads)
   if (typeof window !== 'undefined') {
     try {
       const stored = sessionStorage.getItem('app_school_settings')
@@ -31,13 +35,15 @@ export async function getSchoolSettings(): Promise<SchoolSettings | null> {
     } catch {}
   }
 
-  // 3. Deduplicate simultaneous requests
-  if (inFlightPromise) return inFlightPromise
+  // C. Deduplicate simultaneous requests (if 5 components mount together, fire 1 query)
+  if (inFlightPromise) {
+    return inFlightPromise
+  }
 
   inFlightPromise = (async () => {
     try {
       const supabase = createClient()
-      // Query ONLY the needed columns — NEVER select('*')
+      // Fetch ONLY necessary display fields — NEVER select('*')
       const { data, error } = await supabase
         .from('school_settings')
         .select('school_name, logo_path, school_phone, school_email')
@@ -67,7 +73,7 @@ export async function getSchoolSettings(): Promise<SchoolSettings | null> {
   return inFlightPromise
 }
 
-// React Hook for drop-in use in any component
+// React Hook for drop-in use in any Navbar, Header, or Login component
 export function useSchoolSettings() {
   const [settings, setSettings] = useState<SchoolSettings | null>(memoryCache)
   const [loading, setLoading] = useState<boolean>(!memoryCache)

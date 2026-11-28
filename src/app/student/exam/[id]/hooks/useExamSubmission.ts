@@ -50,69 +50,82 @@ export function useExamSubmission({
 
   const handleSubmit = useCallback(
     async (isAuto = false, reason = "manual") => {
-      if (isSubmittingRef.current || !attemptId) return
+      // 1. Synchronous lock check: Prevents double-click submission races immediately
+      if (isSubmittingRef.current || !attemptId || examEndedRef.current) return
 
-      const alreadySubmitted = await checkAttemptAlreadySubmitted(attemptId)
-      if (alreadySubmitted) {
-        toast.warning("This exam has already been submitted.")
-        examEndedRef.current = true
-        dispatch({ type: "END_EXAM" })
-        return
-      }
-
+      // Lock instantly before ANY async network calls
       isSubmittingRef.current = true
       examEndedRef.current = true
       stopTimer()
       dispatch({ type: "SUBMIT_BEGIN" })
 
       try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen()
+        // 2. Safe fullscreen exit
+        if (typeof document !== "undefined" && document.fullscreenElement) {
+          try {
+            await document.exitFullscreen()
+          } catch {
+            /* browser fullscreen exit ignore */
+          }
         }
-      } catch {
-        /* noop */
-      }
 
-      const { success, result, error } = await submitExam({
-        attemptId,
-        examId,
-        studentId,
-        answers,
-        allQuestions,
-        examDuration,
-        passingPercentage,
-        maxAttempts,
-        tabSwitches,
-        fullscreenExits,
-        isAuto,
-        reason,
-        theoryQuestionCount,
-      })
+        // 3. Fast double-submission guard check
+        const alreadySubmitted = await checkAttemptAlreadySubmitted(attemptId)
+        if (alreadySubmitted) {
+          toast.warning("This exam has already been submitted.")
+          dispatch({ type: "END_EXAM" })
+          return
+        }
 
-      if (!success || !result) {
-        toast.error(`Failed to submit exam: ${error ?? "Unknown error"}`)
+        // 4. Submit to database with 3-tier scoring logic
+        const { success, result, error } = await submitExam({
+          attemptId,
+          examId,
+          studentId,
+          answers,
+          allQuestions,
+          examDuration,
+          passingPercentage,
+          maxAttempts,
+          tabSwitches,
+          fullscreenExits,
+          isAuto,
+          reason,
+          theoryQuestionCount,
+        })
+
+        if (!success || !result) {
+          toast.error(`Failed to submit exam: ${error ?? "Unknown error"}`)
+          dispatch({ type: "SUBMIT_FAIL" })
+          // Allow student to retry submission if an unexpected network error occurs
+          isSubmittingRef.current = false
+          examEndedRef.current = false
+          return
+        }
+
+        // 5. Store completed result
+        setExamResult(result)
+        dispatch({ type: "SUBMIT_SUCCESS" })
+
+        const hasTheory = result.status === "pending_theory"
+        const msg = hasTheory
+          ? `Theory submitted for grading. Objective score: ${result.percentage}%`
+          : `Score: ${result.percentage}%`
+
+        if (isAuto && reason === "Time expired") {
+          toast.error(`⏰ Time's up! Exam auto-submitted. ${msg}`, {
+            duration: EXAM_CONFIG.AUTO_SUBMIT_TOAST_DURATION_MS,
+          })
+        } else {
+          toast.success(
+            `${isAuto ? "Exam auto-submitted." : "Exam completed successfully!"} ${msg}`,
+          )
+        }
+      } catch (err: any) {
+        toast.error(`Submission error: ${err?.message || "Please check connection"}`)
         dispatch({ type: "SUBMIT_FAIL" })
         isSubmittingRef.current = false
-        return
-      }
-
-      setExamResult(result)
-      dispatch({ type: "SUBMIT_SUCCESS" })
-      isSubmittingRef.current = false
-
-      const hasTheory = result.status === "pending_theory"
-      const msg = hasTheory
-        ? `Theory pending grading. Score: ${result.percentage}%`
-        : `Score: ${result.percentage}%`
-
-      if (isAuto && reason === "Time expired") {
-        toast.error(`⏰ Time's up! Exam auto-submitted. ${msg}`, {
-          duration: EXAM_CONFIG.AUTO_SUBMIT_TOAST_DURATION_MS,
-        })
-      } else {
-        toast.success(
-          `${isAuto ? "Exam auto-submitted." : "Exam completed!"} ${msg}`,
-        )
+        examEndedRef.current = false
       }
     },
     [
