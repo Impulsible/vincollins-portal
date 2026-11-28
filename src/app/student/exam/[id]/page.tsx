@@ -149,9 +149,26 @@ export default function TakeExamPage() {
     return Array.from(new Set(ids))
   }, [profile])
 
-  // ── Realtime Attendance & Block Listener (with bfcache cleanup) ────────
+  // ── Attendance Exclusion Gate ──────────────────────────────────────────
+  const isExcludedFromAttendance = useMemo(() => {
+    if (locallyAdmitted) return false
+    if (!exam || studentCandidateIds.length === 0) return false
+
+    const excludedList: string[] = ((exam as any).excluded_student_ids || [])
+      .map(String)
+      .map((s: string) => s.toLowerCase())
+
+    if (excludedList.length === 0) return false
+
+    return studentCandidateIds.some((id) => excludedList.includes(id.toLowerCase()))
+  }, [exam, studentCandidateIds, locallyAdmitted])
+
+  // ── Optimized Realtime Attendance Listener (Only connects if student is excluded) ──
   useEffect(() => {
-    if (!examId || studentCandidateIds.length === 0) return
+    // Zero-Socket: Do NOT open WebSockets if student is already inside taking the exam or admitted
+    if (!examId || studentCandidateIds.length === 0 || state.examStarted || !isExcludedFromAttendance) {
+      return
+    }
 
     const supabase = createClient()
     const channel = supabase
@@ -176,9 +193,6 @@ export default function TakeExamPage() {
           if (!stillExcluded) {
             toast.success("You have been admitted to the exam hall! Unlocking session...")
             setLocallyAdmitted(true)
-          } else if (state.examStarted) {
-            toast.error("You have been blocked by the exam officer. Submitting...")
-            void handleSubmitRef.current(true, "Blocked by exam officer")
           }
         }
       )
@@ -194,7 +208,7 @@ export default function TakeExamPage() {
       window.removeEventListener("pagehide", handlePageHide)
       supabase.removeChannel(channel)
     }
-  }, [examId, studentCandidateIds, state.examStarted])
+  }, [examId, studentCandidateIds, state.examStarted, isExcludedFromAttendance])
 
   const { extraMinutes: liveExtraMinutes } = useExtraTimeSync({
     attemptId: attemptId ?? undefined,
@@ -371,7 +385,6 @@ export default function TakeExamPage() {
   )
 
   const onResumeExam = useCallback(async () => {
-    // User clicked "Resume Exam" -> user gesture is active here!
     await safeRequestFullscreen()
     setFullscreen(true)
 
@@ -392,7 +405,6 @@ export default function TakeExamPage() {
   }, [isResumeQuery, resumeData, state.examStarted, showResumeDialog, onResumeExam])
 
   const startExam = useCallback(async () => {
-    // 1. Enter fullscreen directly inside the click event handler
     await safeRequestFullscreen()
     setFullscreen(true)
 
@@ -426,20 +438,6 @@ export default function TakeExamPage() {
       toast.error("Please click again or press F11 to enter fullscreen.")
     }
   }, [setFullscreen, setShowFullscreenPrompt])
-
-  // ── Attendance Exclusion Gate ──────────────────────────────────────────
-  const isExcludedFromAttendance = useMemo(() => {
-    if (locallyAdmitted) return false
-    if (!exam || studentCandidateIds.length === 0) return false
-
-    const excludedList: string[] = ((exam as any).excluded_student_ids || [])
-      .map(String)
-      .map((s: string) => s.toLowerCase())
-
-    if (excludedList.length === 0) return false
-
-    return studentCandidateIds.some((id) => excludedList.includes(id.toLowerCase()))
-  }, [exam, studentCandidateIds, locallyAdmitted])
 
   const handleCheckAdmissionStatus = async () => {
     setIsCheckingAdmission(true)
